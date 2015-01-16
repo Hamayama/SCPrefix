@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-16 v1.00
+    2015-1-16 v1.01
 -->
 <style type="text/css">
 <!--
@@ -255,20 +255,22 @@ var SCPrefix;
         var i;
         var msg;
 
-        // ***** 文(ステートメント)のコンパイル *****
+        // ***** コンパイル *****
         code = [];
         debugpos1 = 0;
         debugpos2 = 0;
         try {
+            // ***** 文(ステートメント)のコンパイル *****
             c_statement(0, token.length - 4); // 終端4個分マイナス
             for (i = 0; i < code.length; i++) {
-                // ***** 生成したコードに終端がまざっていたとき *****
+                // ***** 生成コードに終端がまざっていたとき *****
                 if (code[i].word == "(end)") {
                     debugpos2 = token.length - 4; // 終端4個分マイナス
                     throw new Error("文が未完成です。");
                 }
             }
         } catch (ex) {
+            // ***** 構文エラーのとき *****
             DebugShow("構文エラー: " + ex.message + ": debugpos=" + debugpos1 + "\n");
             msg = "エラー場所: " + token[debugpos1].line_no + "行: ";
             if (debugpos2 <= debugpos1) { debugpos2 = debugpos1 + 1; }
@@ -279,6 +281,7 @@ var SCPrefix;
             }
             DebugShow(msg + "\n");
         }
+        // ***** 後処理 *****
         for (i = 0; i < code.length; i++) {
             // (最適化処理 : 括弧のbeginのリネームを元に戻す)
             if (code[i].word == "(begin)") {
