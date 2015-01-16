@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>SCPrefix</title>
+<!--
+    scprefix.html
+    2015-1-16 v1.00
+-->
+<style type="text/css">
+<!--
+.main_container {
+    background-color: #fffca8; /* 背景色 */
+    color: #000000;            /* 文字色 */
+}
+-->
+</style>
+<script type="text/javascript">
+<!--
+// ****************************************
+//            ブラウザ関連処理等
+// ****************************************
+
+// ***** 汎用 *****
+function Alm(msg) {
+    // alert(msg);
+}
+function Alm2(msg) {
+    alert(msg);
+}
+function DebugShow(msg) {
+    document.getElementById("debug_show1").appendChild(document.createTextNode(msg));
+}
+function DebugShowClear() {
+    document.getElementById("debug_show1").innerHTML = "";
+}
+
+// ***** 変換ボタン *****
+function convert_button() {
+    var ret;
+    var src_st;
+    var result = {};
+
+    // ***** 戻り値の初期化 *****
+    ret = false;
+    // ***** デバッグ表示の初期化 *****
+    DebugShowClear();
+    // ***** 要素の存在チェック *****
+    if (!document.getElementById("src_text1"))    { Alm("convert_button:0001"); return ret; }
+    if (!document.getElementById("out_text1"))    { Alm("convert_button:0005"); return ret; }
+    if (!document.getElementById("result_show1")) { Alm("convert_button:0006"); return ret; }
+    // ***** ソースの取得 *****
+    src_st = document.getElementById("src_text1").value;
+    // ***** 変換実行 *****
+    result = SCPrefix.convert(src_st);
+    // ***** 出力の表示 *****
+    document.getElementById("out_text1").value = result.out;
+    document.getElementById("result_show1").innerHTML = result.html;
+    // ***** 戻り値を返す *****
+    ret = true;
+    return ret;
+}
+
+// ***** クリアボタン *****
+function clear_button() {
+    var ret;
+
+    // ***** 戻り値の初期化 *****
+    ret = false;
+    // ***** デバッグ表示の初期化 *****
+    DebugShowClear();
+    // ***** 要素の存在チェック *****
+    if (!document.getElementById("src_text1"))    { Alm("clear_button:0001"); return ret; }
+    if (!document.getElementById("out_text1"))    { Alm("clear_button:0002"); return ret; }
+    if (!document.getElementById("result_show1")) { Alm("clear_button:0003"); return ret; }
+    // ***** ソースのクリア *****
+    document.getElementById("src_text1").value = "";
+    // ***** 出力のクリア *****
+    document.getElementById("out_text1").value = "";
+    document.getElementById("result_show1").innerHTML = "";
+    // ***** 戻り値を返す *****
+    ret = true;
+    return ret;
+}
+
+
+// ****************************************
+//          中置記法→前置記法変換
+// ****************************************
+
+// ***** SCPrefix(名前空間) *****
+//
+// 公開I/F :
+//
+//   SCPrefix.convert(src_st)  変換実行
+//     src_st  ソース(文字列)
+//     戻り値  結果オブジェクト
+//               result.out   テキスト出力(文字列)
+//               result.html  HTML出力(文字列)
+//
+var SCPrefix;
+(function (SCPrefix) {
+    // ***** 定数 *****
+    var operator_table = { // 演算子情報
+        "("  :"(",
+        ")"  :")",
+        "!"  :"not",
+        "~"  :"lognot",
+        "+"  :"+",
+        "-"  :"-",
+        "++" :"inc!",
+        "--" :"dec!",
+        "**" :"expt",
+        "*"  :"*",
+        "/"  :"/",
+        "*." :"*.",
+        "/." :"/.",
+        "\\" :"quotient",
+        "%"  :"modulo",
+        // "+"  :"+",     // 重複
+        // "-"  :"-",     // 重複
+        "+." :"+.",
+        "-." :"-.",
+        "<<" :"ash",
+        ">>" :"ash",      // (ash n1 (- n2))
+        "<"  :"<",
+        "<=" :"<=",
+        ">"  :">",
+        ">=" :">=",
+        "==" :"=",
+        "!=" :"=",        // (not (= n1 n2))
+        "&"  :"logand",
+        "|"  :"logior",
+        "^"  :"logxor",
+        "&&" :"and",
+        "||" :"or",
+        "?"  :"if",
+        ":"  :":",
+        ","  :",",
+        "="  :"set!",
+        "*=" :"*=",
+        "/=" :"/=",
+        "*.=":"*.=",
+        "/.=":"/.=",
+        "+=" :"+=",
+        "-=" :"-=",
+        "+.=":"+.=",
+        "-.=":"-.=",
+        "\\=":"\\=",
+        "%=" :"%=",
+        "<<=":"<<=",
+        ">>=":">>=",
+        "&=" :"&=",
+        "|=" :"|=",
+        "^=" :"^=" };
+
+    // ***** 変数 *****
+    var src_st;     // ソース(文字列)
+    var out_st;     // テキスト出力(文字列)
+    var html_st;    // HTML出力(文字列)
+    var token = []; // トークン(配列)
+                    //   token[i].word     単語(文字列)
+                    //   token[i].line_no  行番号(1オリジン)
+    var code = [];  // コード(配列)
+                    //   code[i].word      単語(文字列)
+                    //   code[i].pos1      デバッグ位置1
+                    //   code[i].pos2      デバッグ位置2
+    var debugpos1;  // デバッグ位置1
+    var debugpos2;  // デバッグ位置2
+
+    // ***** 公開I/F *****
+
+    // ***** 変換実行 *****
+    function convert(src_st1) {
+        var result = {}; // 戻り値
+
+        // ***** 戻り値の初期化 *****
+        result = {};
+        result.out = "";
+        result.html = "";
+        // ***** 引数のチェック *****
+        if (src_st1 == null) { Alm("SCPrefix.convert:0001"); return result; }
+        // ***** ソースの取得 *****
+        src_st = src_st1;
+        // ***** トークン分割 *****
+        tokenize();
+        // ***** コンパイル *****
+        compile();
+        // ***** 出力の生成 *****
+        make_output();
+        // ***** 戻り値を返す *****
+        result.out = out_st;
+        result.html = html_st;
+        return result;
+    }
+    SCPrefix.convert = convert;
+
+    // ***** 公開I/Fはここまで *****
+
+    // ***** 以下は内部処理用 *****
+
+    // ***** 出力の生成 *****
+    function make_output() {
+        var i;
+        var code_length; // コード数
+        var arr_st = []; // 文字列の配列
+
+        // ***** テキスト出力の生成 *****
+        out_st = "";
+        arr_st = [];
+        code_length = code.length;
+        for (i = 0; i < code_length; i++) {
+            // ***** 前方の空白を追加 *****
+            if (i > 0 &&
+                !(code[i - 1].word == "(" || code[i].word == ")" ||
+                code[i - 1].word == "\n" || code[i].word == "\n")) {
+                arr_st.push(" ");
+            }
+            // ***** 単語を追加 *****
+            arr_st.push(code[i].word);
+        }
+        out_st = arr_st.join("");
+
+        // ***** HTML出力の生成 *****
+        html_st = "";
+        arr_st = [];
+        code_length = code.length;
+        for (i = 0; i < code_length; i++) {
+            // ***** 前方の空白を追加 *****
+            if (i > 0 &&
+                !(code[i - 1].word == "(" || code[i].word == ")" ||
+                code[i - 1].word == "\n" || code[i].word == "\n")) {
+                arr_st.push(" ");
+            }
+            // ***** 単語をサニタイズ(タグ無効化)してから追加 *****
+            arr_st.push(escape_html(code[i].word));
+        }
+        html_st = arr_st.join("");
+
+        // ***** デバッグ表示 *****
+        if (0) {
+            DebugShow("token:\n");
+            for (i = 0; i < token.length; i++) {
+                DebugShow(JSON.stringify(token[i]) + "\n");
+            }
+            DebugShow("code:\n");
+            for (i = 0; i < code.length; i++) {
+                DebugShow(JSON.stringify(code[i]) + "\n");
+            }
+        }
+    }
+
+    // ***** コンパイル *****
+    function compile() {
+        var i;
+        var msg;
+
+        // ***** 文(ステートメント)のコンパイル *****
+        code = [];
+        debugpos1 = 0;
+        debugpos2 = 0;
+        try {
+            c_statement(0, token.length - 4); // 終端4個分マイナス
+            for (i = 0; i < code.length; i++) {
+                // ***** 生成したコードに終端がまざっていたとき *****
+                if (code[i].word == "(end)") {
+                    debugpos2 = token.length - 4; // 終端4個分マイナス
+                    throw new Error("文が未完成です。");
+                }
+            }
+        } catch (ex) {
+            DebugShow("構文エラー: " + ex.message + ": debugpos=" + debugpos1 + "\n");
+            msg = "エラー場所: " + token[debugpos1].line_no + "行: ";
+            if (debugpos2 <= debugpos1) { debugpos2 = debugpos1 + 1; }
+            for (i = debugpos1; i < debugpos2; i++) {
+                if (i >= 0 && i < token.length - 4) { // 終端4個分マイナス
+                    msg = msg + token[i].word + " ";
+                }
+            }
+            DebugShow(msg + "\n");
+        }
+        for (i = 0; i < code.length; i++) {
+            // (最適化処理 : 括弧のbeginのリネームを元に戻す)
+            if (code[i].word == "(begin)") {
+                code[i].word = "begin";
+            }
+            // (終端処理 : エラー表示用)
+            if (code[i].word == "(end)") {
+                code[i].word = "";
+            }
+        }
+    }
+    // ***** 文(ステートメント)のコンパイル *****
+    function c_statement(sym_start, sym_end) {
+        var i;
+        var sym;
+        var code_pos1;
+
+        // ***** シンボル解析のループ *****
+        i = sym_start;
+        while (i < sym_end) {
+            // ***** シンボル取り出し *****
+            debugpos1 = i;
+            sym = token[i].word;
+            // ***** 「;」のとき *****
+            if (sym == ";") {
+                i++;
+                continue;
+            }
+            // ***** 終端のとき *****
+            if (sym == "(end)") {
+                i++;
+                continue;
+            }
+            // ***** 式のコンパイル *****
+            code_pos1 = code.length;
+            i = c_expression(i, sym_end);
+            // (最適化処理 : 代入のbegin,begin0を削除)
+            if (code_pos1 <= code.length + 4 && code[code_pos1].word == "(") {
+                if (code[code_pos1 + 1].word == "begin") {
+                    code.splice(code_pos1, 2);
+                    code.splice(code.length - 2, 2);
+                } else if (code[code_pos1 + 1].word == "begin0") {
+                    code.splice(code_pos1, 3);
+                    code.splice(code.length - 1, 1);
+                }
+            }
+            code_push("\n", debugpos1, i);
+        }
+    }
+    // ***** 式のコンパイル *****
+    // (priority はオプション引数で、演算子の優先順位を表す。大きいほど優先順位が高い)
+    function c_expression(sym_start, sym_end, priority) {
+        var i;
+        var sym;
+        var code_pos1;
+
+        // ***** 引数のチェック *****
+        if (priority == null) { priority = 0; }
+        // ***** 因子のコンパイル *****
+        i = sym_start;
+        code_pos1 = code.length;
+        i = c_factor(i, sym_end);
+        // ***** 演算子処理のループ *****
+        while (i < sym_end) {
+            // ***** シンボル取り出し *****
+            // debugpos1 = i;
+            sym = token[i].word;
+
+            // ***** 論理AND,ORのとき *****
+            if ((sym == "&&" || sym == "||") && priority < 10) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 10);
+                // (最適化処理 : 同一演算子による計算をまとめる)
+                while (i < sym_end) {
+                    if (token[i].word != sym) { break; }
+                    i++;
+                    i = c_expression(i, sym_end, 10);
+                }
+                code_push(")", debugpos1, i);
+                continue;
+            }
+            // ***** 3項演算子のとき *****
+            if (sym == "?" && priority < 10) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 9); // 右結合
+                match2(":", i++);
+                i = c_expression(i, sym_end, 9); // 右結合
+                // match2(";", i++);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** ビットAND,OR,XORのとき *****
+            if ((sym == "&" || sym == "|" || sym == "^") && priority < 15) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 15);
+                // (最適化処理 : 同一演算子による計算をまとめる)
+                while (i < sym_end) {
+                    if (token[i].word != sym) { break; }
+                    i++;
+                    i = c_expression(i, sym_end, 15);
+                }
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** 数値比較のとき *****
+            if ((sym == "<" || sym == "<=" || sym == ">" || sym == ">=" ||
+                sym == "==") && priority < 20) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 20);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+            if (sym == "!=" && priority < 20) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, "not", debugpos1, i);
+                code_insert(code_pos1 + 2, "(", debugpos1, i);
+                code_insert(code_pos1 + 3, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 20);
+                code_push(")", debugpos1, i);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** ビットシフトのとき *****
+            if (sym == "<<" && priority < 25) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 25);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+            if (sym == ">>" && priority < 25) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                code_push("(", debugpos1, i);
+                code_push("-", debugpos1, i);
+                i = c_expression(i, sym_end, 25);
+                code_push(")", debugpos1, i);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** 加減算のとき *****
+            if ((sym == "+" || sym == "-" || sym == "+." || sym == "-.") && priority < 30) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 30);
+                // (最適化処理 : 同一演算子による計算をまとめる)
+                while (i < sym_end) {
+                    if (token[i].word != sym) { break; }
+                    i++;
+                    i = c_expression(i, sym_end, 30);
+                }
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** 乗除算のとき *****
+            if ((sym == "*" || sym == "/" || sym == "*." || sym == "/.") && priority < 40) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 40);
+                // (最適化処理 : 同一演算子による計算をまとめる)
+                while (i < sym_end) {
+                    if (token[i].word != sym) { break; }
+                    i++;
+                    i = c_expression(i, sym_end, 40);
+                }
+                code_push(")", debugpos1, i);
+                continue;
+            }
+            if ((sym == "\\" || sym == "%") && priority < 40) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 40);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** べき乗のとき *****
+            if (sym == "**" && priority < 45) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, opfunc(sym), debugpos1, i);
+                i = c_expression(i, sym_end, 45);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** 演算子処理のループを抜ける *****
+            break;
+        }
+        // ***** 戻り値を返す *****
+        return i;
+    }
+    // ***** 因子のコンパイル *****
+    function c_factor(sym_start, sym_end) {
+        var i;
+        var sym;
+        var code_pos1;
+        var code_pos2;
+        var comma_count;
+        var var_name;
+
+        // ***** シンボル取り出し *****
+        i = sym_start;
+        // debugpos1 = i;
+        sym = token[i].word;
+        // ***** 論理NOT,ビットNOT,負符号のとき *****
+        if (sym == "!" || sym == "~" || sym == "-") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push(opfunc(sym), debugpos1, i);
+            i = c_factor(i, sym_end);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+        // ***** 正符号のとき *****
+        if (sym == "+") {
+            i++;
+            i = c_factor(i, sym_end);
+            return i;
+        }
+        // ***** 括弧のとき *****
+        if (sym == "(") {
+            i++;
+            // ***** 式のコンパイル *****
+            code_pos2 = code.length;
+            code_push("(", debugpos1, i);
+            // (最適化処理 : 括弧のbeginを代入のbeginと区別するためにリネーム)
+            code_push("(begin)", debugpos1, i);
+            code_pos1 = code.length;
+            i = c_expression(i, sym_end);
+            // ***** カンマ区切りの処理 *****
+            comma_count = 0;
+            while (i < sym_end) {
+                if (token[i].word != ",") { break; }
+                i++;
+                comma_count++; 
+                // (最適化処理 : 代入のbegin,begin0を削除)
+                if (code_pos1 <= code.length + 4 && code[code_pos1].word == "(") {
+                    if (code[code_pos1 + 1].word == "begin") {
+                        code.splice(code_pos1, 2);
+                        code.splice(code.length - 2, 2);
+                    } else if (code[code_pos1 + 1].word == "begin0") {
+                        code.splice(code_pos1, 3);
+                        code.splice(code.length - 1, 1);
+                    }
+                }
+                i = c_expression(i, sym_end);
+            }
+            match2(")", i++);
+            if (comma_count == 0) {
+                // (最適化処理 : 括弧のbeginを削除)
+                code.splice(code_pos2, 2);
+            } else {
+                code_push(")", debugpos1, i);
+            }
+            // ***** 戻り値を返す *****
+            return i;
+        }
+        // ***** プレINC,DECのとき *****
+        if (sym == "++" || sym == "--") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push("begin", debugpos1, i);
+            code_push("(", debugpos1, i);
+            code_push(opfunc(sym), debugpos1, i);
+            var_name = token[i].word;
+            i++;
+            code_push(var_name, debugpos1, i);
+            code_push(")", debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+
+        // ***** 変数名の取得 *****
+        var_name = sym;
+        i++;
+        if (operator_table.hasOwnProperty(sym)) {
+            throw new Error("不正な位置に演算子 '" + sym + "' が見つかりました。");
+        }
+
+        // ***** 関数のとき *****
+        if (token[i].word == "(") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            // ***** 引数の取得 *****
+            if (token[i].word == ")") {
+                i++;
+            } else {
+                while (i < sym_end) {
+                    i = c_expression(i, sym_end);
+                    if (token[i].word != ",") { break; }
+                    i++;
+                }
+                match2(")", i++);
+            }
+            code_push(")", debugpos1, i);
+            // ***** 戻り値を返す *****
+            return i;
+        }
+
+        // ***** 変数の処理 *****
+
+        // ***** シンボル取り出し *****
+        sym = token[i].word;
+        // ***** ポストINC,DECのとき *****
+        if (sym == "++" || sym == "--") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push("begin0", debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push("(", debugpos1, i);
+            code_push(opfunc(sym), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push(")", debugpos1, i);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+        // ***** 代入のとき *****
+        if (sym == "=") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push("begin", debugpos1, i);
+            code_push("(", debugpos1, i);
+            code_push(opfunc(sym), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            i = c_expression(i, sym_end);
+            code_push(")", debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+        // ***** 複合代入のとき *****
+        if (sym == "+=" || sym == "-=" || sym == "+.=" || sym == "-.=" ||
+            sym == "*=" || sym == "/=" || sym == "*.=" || sym == "/.=" ||
+            sym == "&=" || sym == "|=" || sym == "^=") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push("begin", debugpos1, i);
+            code_push("(", debugpos1, i);
+            code_push(opfunc("="), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push("(", debugpos1, i);
+            sym = sym.substring(0, sym.length - 1);
+            code_push(opfunc(sym), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_pos1 = code.length;
+            i = c_expression(i, sym_end);
+            // (最適化処理 : 同一演算子による計算をまとめる)
+            if (code_pos1 <= code.length + 3 && code[code_pos1].word == "(") {
+                if (code[code_pos1 + 1].word == sym) {
+                    code.splice(code_pos1, 2);
+                    code.splice(code.length - 1, 1);
+                }
+            }
+            code_push(")", debugpos1, i);
+            code_push(")", debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+        if (sym == "\\=" || sym == "%=" || sym == "<<=") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push("begin", debugpos1, i);
+            code_push("(", debugpos1, i);
+            code_push(opfunc("="), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push("(", debugpos1, i);
+            sym = sym.substring(0, sym.length - 1);
+            code_push(opfunc(sym), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            i = c_expression(i, sym_end);
+            code_push(")", debugpos1, i);
+            code_push(")", debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+        if (sym == ">>=") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push("begin", debugpos1, i);
+            code_push("(", debugpos1, i);
+            code_push(opfunc("="), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push("(", debugpos1, i);
+            sym = sym.substring(0, sym.length - 1);
+            code_push(opfunc(sym), debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push("(", debugpos1, i);
+            code_push("-", debugpos1, i);
+            i = c_expression(i, sym_end);
+            code_push(")", debugpos1, i);
+            code_push(")", debugpos1, i);
+            code_push(")", debugpos1, i);
+            code_push(var_name, debugpos1, i);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+
+        // ***** 変数名をセット *****
+        code_push(var_name, debugpos1, i);
+
+        // ***** 戻り値を返す *****
+        return i;
+    }
+
+    // ***** トークン分割 *****
+    function tokenize() {
+        var i;
+        var i_start;      // 単語の開始位置
+        var src_st_len;   // ソースの長さ
+        var ch, ch2;      // 文字
+        var line_no;      // 行番号(1オリジン)
+
+        // ***** トークン分割 *****
+        token = [];
+        i = 0;
+        line_no = 1;
+        src_st_len = src_st.length;
+        while (i < src_st_len) {
+            // ***** 1文字取り出す *****
+            i_start = i;
+            ch = src_st.charAt(i++);
+            if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+            // ***** 空白かTABのとき *****
+            if (ch == " " || ch == "\t") { continue; }
+            // ***** 改行のとき *****
+            if (ch == "\r" && ch2 == "\n") { i++; line_no++; continue; }
+            if (ch == "\r" || ch == "\n") { line_no++; continue; }
+            // ***** コメント「//」のとき *****
+            if (ch == "/" && ch2 == "/") {
+                i++;
+                while (i < src_st_len) {
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    if (ch == "\r" && ch2 == "\n") { i++; line_no++; break; }
+                    if (ch == "\r" || ch == "\n") { line_no++; break; }
+                }
+                continue;
+            }
+            // ***** コメント「/*～*/」のとき *****
+            if (ch == "/" && ch2 == "*") {
+                i++;
+                while (i < src_st_len) {
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    if (ch == "*" && ch2 == "/") { i++; break; }
+                    if (ch == "\r" && ch2 == "\n") { i++; line_no++; continue; }
+                    if (ch == "\r" || ch == "\n") { line_no++; continue; }
+                }
+                continue;
+            }
+            // ***** 演算子のとき *****
+            if (ch == "(" || ch == ")" || ch == "~" || ch == "?" || ch == ":" || ch == ";" || ch == ",") {
+                token_push(src_st.substring(i_start, i), line_no);
+                continue;
+            }
+            if (ch == "=" || ch == "!" || ch == "^" || ch == "\\" || ch == "%") {
+                if (ch2 == "=") { i++; }
+                token_push(src_st.substring(i_start, i), line_no);
+                continue;
+            }
+            if (ch == "+" || ch == "-" || ch == "*") {
+                if (ch2 == ch || ch2 == "=") { i++; }
+                if (ch2 == ".") {
+                    i++;
+                    if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
+                }
+                token_push(src_st.substring(i_start, i), line_no);
+                continue;
+            }
+            if (ch == "/") {
+                if (ch2 == "=") { i++; }
+                if (ch2 == ".") {
+                    i++;
+                    if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
+                }
+                token_push(src_st.substring(i_start, i), line_no);
+                continue;
+            }
+            if (ch == "<" || ch == ">") {
+                if (ch2 == "=") { i++; }
+                if (ch2 == ch) {
+                    i++;
+                    if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
+                }
+                token_push(src_st.substring(i_start, i), line_no);
+                continue;
+            }
+            if (ch == "&" || ch == "|") {
+                if (ch2 == ch || ch2 == "=") { i++; }
+                token_push(src_st.substring(i_start, i), line_no);
+                continue;
+            }
+            // ***** その他のとき *****
+            while (i < src_st_len) {
+                // ***** 1文字取り出す *****
+                ch = src_st.charAt(i);
+                // ***** デリミタのとき *****
+                // (ドットは不要だった)
+                // if (" \t\r\n()~?:;,=!^\\%+-*/.<>&|".indexOf(ch) >= 0) { break; }
+                if (" \t\r\n()~?:;,=!^\\%+-*/<>&|".indexOf(ch) >= 0) { break; }
+                // ***** その他のとき *****
+                i++;
+            }
+            token_push(src_st.substring(i_start, i), line_no);
+        }
+        // ***** 終端4個追加(安全のため) *****
+        token_push("(end)", line_no);
+        token_push("(end)", line_no);
+        token_push("(end)", line_no);
+        token_push("(end)", line_no);
+    }
+
+    // ***** トークン追加 *****
+    function token_push(word, line_no) {
+        var tk = {};
+        tk.word = word;
+        tk.line_no = line_no;
+        token.push(tk);
+    }
+
+    // ***** コード追加 *****
+    function code_push(word, pos1, pos2) {
+        var cd = {};
+        cd.word = word;
+        cd.pos1 = pos1;
+        cd.pos2 = pos2;
+        code.push(cd);
+    }
+
+    // ***** コード挿入 *****
+    function code_insert(i, word, pos1, pos2) {
+        var cd = {};
+        cd.word = word;
+        cd.pos1 = pos1;
+        cd.pos2 = pos2;
+        code.splice(i, 0, cd);
+    }
+
+    // ***** トークンの文字チェック *****
+    function match2(ch, i) {
+        if (i >= token.length - 4) { // 終端4個分マイナス
+            debugpos2 = token.length - 4; // 終端4個分マイナス
+            throw new Error("'" + ch + "' が見つかりませんでした。");
+        }
+        if (ch != token[i].word) {
+            debugpos2 = i + 1;
+            throw new Error("'" + ch + "' があるべき所に '" + token[i].word + "' が見つかりました。");
+        }
+        // ***** 加算されないので注意 *****
+        // i++;
+    }
+
+    // ***** 演算子検索 *****
+    function opfunc(op) {
+        if (operator_table.hasOwnProperty(op)) {
+            return operator_table[op];
+        }
+        throw new Error("未登録の演算子 '" + op + "' が見つかりました。");
+    }
+
+    // ***** HTML文字列のエスケープ処理 *****
+    function escape_html(html_st) {
+        return html_st
+            .replace(/&/g,   "&amp;")
+            .replace(/[<]/g, "&lt;")
+            .replace(/>/g,   "&gt;")
+            .replace(/"/g,   "&quot;")
+            .replace(/'/g,   "&#39;");
+    }
+
+
+})(SCPrefix || (SCPrefix = {}));
+
+
+// -->
+</script>
+</head>
+
+<body class="main_container">
+
+<form action="#" onsubmit="convert_button(); return false;">
+<table width="95%"><tr>
+<th align="center" colspan="3">SCPrefix</th>
+</tr><tr>
+<th align="left" valign="top">src:</th>
+<th align="left" width="95%"><textarea id="src_text1" cols="40" rows="10" style="width: 100%;"></textarea></th>
+<th></th>
+</tr><tr>
+<th></th>
+<th align="left"><input type="submit" value="convert"> &nbsp;
+<input type="button" value="clear" onclick="clear_button();"></th>
+<th></th>
+</tr><tr>
+<th align="left" valign="top">out:</th>
+<th align="left" width="95%"><textarea id="out_text1" cols="40" rows="10" style="width: 100%;"></textarea></th>
+<th></th>
+</tr></table>
+<pre><span id="debug_show1"></span></pre>
+<pre><span id="result_show1"></span></pre>
+</form>
+
+</body>
+</html>
