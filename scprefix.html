@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-17 v1.02
+    2015-1-18 v1.03
 -->
 <style type="text/css">
 <!--
@@ -39,6 +39,7 @@ function DebugShowClear() {
 function convert_button() {
     var ret;
     var src_st;
+    var minus_conv;
     var result = {};
 
     // ***** 戻り値の初期化 *****
@@ -47,12 +48,14 @@ function convert_button() {
     DebugShowClear();
     // ***** 要素の存在チェック *****
     if (!document.getElementById("src_text1"))    { Alm("convert_button:0001"); return ret; }
-    if (!document.getElementById("out_text1"))    { Alm("convert_button:0005"); return ret; }
-    if (!document.getElementById("result_show1")) { Alm("convert_button:0006"); return ret; }
+    if (!document.getElementById("minus_conv"))   { Alm("convert_button:0002"); return ret; }
+    if (!document.getElementById("out_text1"))    { Alm("convert_button:0003"); return ret; }
+    if (!document.getElementById("result_show1")) { Alm("convert_button:0004"); return ret; }
     // ***** ソースの取得 *****
     src_st = document.getElementById("src_text1").value;
+    minus_conv = document.getElementById("minus_conv").checked;
     // ***** 変換実行 *****
-    result = SCPrefix.convert(src_st);
+    result = SCPrefix.convert(src_st, minus_conv);
     // ***** 出力の表示 *****
     document.getElementById("out_text1").value = result.out;
     document.getElementById("result_show1").innerHTML = result.html;
@@ -92,11 +95,13 @@ function clear_button() {
 //
 // 公開I/F :
 //
-//   SCPrefix.convert(src_st)  変換実行
-//     src_st  ソース(文字列)
-//     戻り値  結果オブジェクト
-//               result.out   テキスト出力(文字列)
-//               result.html  HTML出力(文字列)
+//   SCPrefix.convert(src_st, minus_conv)  変換実行
+//     src_st      ソース(文字列)
+//     minus_conv  マイナス変換フラグ(boolean)
+//                   (-を+-に変換することで、多項式の変換結果を若干見やすくする)
+//     戻り値      結果オブジェクト
+//                   result.out   テキスト出力(文字列)
+//                   result.html  HTML出力(文字列)
 //
 var SCPrefix;
 (function (SCPrefix) {
@@ -155,23 +160,24 @@ var SCPrefix;
         "^=" :"^=" };
 
     // ***** 変数 *****
-    var src_st;     // ソース(文字列)
-    var out_st;     // テキスト出力(文字列)
-    var html_st;    // HTML出力(文字列)
-    var token = []; // トークン(配列)
-                    //   token[i].word     単語(文字列)
-                    //   token[i].line_no  行番号(1オリジン)
-    var code = [];  // コード(配列)
-                    //   code[i].word      単語(文字列)
-                    //   code[i].pos1      デバッグ位置1
-                    //   code[i].pos2      デバッグ位置2
-    var debugpos1;  // デバッグ位置1
-    var debugpos2;  // デバッグ位置2
+    var src_st;      // ソース(文字列)
+    var minus_conv;  // マイナス変換フラグ(boolean)
+    var out_st;      // テキスト出力(文字列)
+    var html_st;     // HTML出力(文字列)
+    var token = [];  // トークン(配列)
+                     //   token[i].word     単語(文字列)
+                     //   token[i].line_no  行番号(1オリジン)
+    var code = [];   // コード(配列)
+                     //   code[i].word      単語(文字列)
+                     //   code[i].pos1      デバッグ位置1
+                     //   code[i].pos2      デバッグ位置2
+    var debugpos1;   // デバッグ位置1
+    var debugpos2;   // デバッグ位置2
 
     // ***** 公開I/F *****
 
     // ***** 変換実行 *****
-    function convert(src_st1) {
+    function convert(src_st1, minus_conv1) {
         var result = {}; // 戻り値
 
         // ***** 戻り値の初期化 *****
@@ -179,9 +185,12 @@ var SCPrefix;
         result.out = "";
         result.html = "";
         // ***** 引数のチェック *****
-        if (src_st1 == null) { Alm("SCPrefix.convert:0001"); return result; }
+        if (src_st1 == null)     { Alm("SCPrefix.convert:0001"); return result; }
+        if (minus_conv1 == null) { Alm("SCPrefix.convert:0002"); return result; }
         // ***** ソースの取得 *****
         src_st = src_st1;
+        // ***** マイナス変換フラグの取得 *****
+        minus_conv = minus_conv1;
         // ***** トークン分割 *****
         tokenize();
         // ***** コンパイル *****
@@ -473,15 +482,16 @@ var SCPrefix;
                 continue;
             }
 
+            // (べき乗の処理は、単項の負符号より強くするため c_factor に移動)
             // ***** べき乗のとき *****
-            if (tok == "**" && priority < 45) {
-                i++;
-                code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 45);
-                code_push(")", debugpos1, i);
-                continue;
-            }
+            // if (tok == "**" && priority < 45) {
+            //     i++;
+            //     code_insert(code_pos1, "(", debugpos1, i);
+            //     code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
+            //     i = c_expression(i, tok_end, 44); // 右結合
+            //     code_push(")", debugpos1, i);
+            //     continue;
+            // }
 
             // ***** 演算子処理のループを抜ける *****
             break;
@@ -501,6 +511,7 @@ var SCPrefix;
 
         // ***** トークン取り出し *****
         i = tok_start;
+        code_pos1 = code.length;
         // debugpos1 = i;
         tok = token[i].word;
         // ***** 論理NOT,ビットNOT,負符号のとき *****
@@ -522,11 +533,10 @@ var SCPrefix;
         if (tok == "(") {
             i++;
             // ***** 式のコンパイル *****
-            code_pos2 = code.length;
             code_push("(", debugpos1, i);
             // (最適化処理 : 括弧のbeginを代入のbeginと区別するためにリネーム)
             code_push("(begin)", debugpos1, i);
-            code_pos1 = code.length;
+            code_pos2 = code.length;
             i = c_expression(i, tok_end);
             // ***** カンマ区切りの処理 *****
             comma_count = 0;
@@ -535,12 +545,12 @@ var SCPrefix;
                 i++;
                 comma_count++; 
                 // (最適化処理 : 代入のbegin,begin0を削除 (戻り値が不要のため))
-                if (code_pos1 <= code.length + 4 && code[code_pos1].word == "(") {
-                    if (code[code_pos1 + 1].word == "begin") {
-                        code.splice(code_pos1, 2);
+                if (code_pos2 <= code.length + 4 && code[code_pos2].word == "(") {
+                    if (code[code_pos2 + 1].word == "begin") {
+                        code.splice(code_pos2, 2);
                         code.splice(code.length - 2, 2);
-                    } else if (code[code_pos1 + 1].word == "begin0") {
-                        code.splice(code_pos1, 3);
+                    } else if (code[code_pos2 + 1].word == "begin0") {
+                        code.splice(code_pos2, 3);
                         code.splice(code.length - 1, 1);
                     }
                 }
@@ -549,11 +559,12 @@ var SCPrefix;
             match2(")", i++);
             if (comma_count == 0) {
                 // (最適化処理 : 括弧のbeginを削除 (式が1個しかないため))
-                code.splice(code_pos2, 2);
+                code.splice(code_pos1, 2);
             } else {
                 code_push(")", debugpos1, i);
             }
-            // ***** 戻り値を返す *****
+            // ***** べき乗の処理 *****
+            i = c_power(i, tok_end, code_pos1);
             return i;
         }
         // ***** プレINC,DECのとき *****
@@ -565,18 +576,23 @@ var SCPrefix;
             code_push(opfunc(tok), debugpos1, i);
             var_name = token[i].word;
             i++;
+            if (operator_table.hasOwnProperty(var_name)) {
+                throw new Error("不正な位置に演算子 '" + var_name + "' が見つかりました。");
+            }
             code_push(var_name, debugpos1, i);
             code_push(")", debugpos1, i);
             code_push(var_name, debugpos1, i);
             code_push(")", debugpos1, i);
+            // ***** べき乗の処理 *****
+            i = c_power(i, tok_end, code_pos1);
             return i;
         }
 
         // ***** 変数名の取得 *****
         var_name = tok;
         i++;
-        if (operator_table.hasOwnProperty(tok)) {
-            throw new Error("不正な位置に演算子 '" + tok + "' が見つかりました。");
+        if (operator_table.hasOwnProperty(var_name)) {
+            throw new Error("不正な位置に演算子 '" + var_name + "' が見つかりました。");
         }
 
         // ***** 関数のとき *****
@@ -596,7 +612,8 @@ var SCPrefix;
                 match2(")", i++);
             }
             code_push(")", debugpos1, i);
-            // ***** 戻り値を返す *****
+            // ***** べき乗の処理 *****
+            i = c_power(i, tok_end, code_pos1);
             return i;
         }
 
@@ -615,6 +632,8 @@ var SCPrefix;
             code_push(var_name, debugpos1, i);
             code_push(")", debugpos1, i);
             code_push(")", debugpos1, i);
+            // ***** べき乗の処理 *****
+            i = c_power(i, tok_end, code_pos1);
             return i;
         }
         // ***** 代入のとき *****
@@ -664,7 +683,24 @@ var SCPrefix;
         // ***** 変数名をセット *****
         code_push(var_name, debugpos1, i);
 
+        // ***** べき乗の処理 *****
+        i = c_power(i, tok_end, code_pos1);
+
         // ***** 戻り値を返す *****
+        return i;
+    }
+    // ***** べき乗の処理 *****
+    function c_power(tok_start, tok_end, code_pos1) {
+        var i;
+        i = tok_start;
+        // ***** べき乗のとき *****
+        if (token[i].word == "**") {
+            i++;
+            code_insert(code_pos1, "(", debugpos1, i);
+            code_insert(code_pos1 + 1, opfunc("**"), debugpos1, i);
+            i = c_factor(i, tok_end);
+            code_push(")", debugpos1, i);
+        }
         return i;
     }
 
@@ -751,7 +787,15 @@ var SCPrefix;
                     i++;
                     if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
                 }
-                token_push(src_st.substring(i_start, i), line_no);
+                temp_st = src_st.substring(i_start, i);
+                // ***** マイナス変換フラグONのとき *****
+                // (-を+-に変換することで、多項式の変換結果を若干見やすくする)
+                if (minus_conv) {
+                    if (temp_st == "-") {
+                        token_push("+", line_no);
+                    }
+                }
+                token_push(temp_st, line_no);
                 continue;
             }
             if (ch == "/") {
@@ -874,7 +918,8 @@ var SCPrefix;
 </tr><tr>
 <th></th>
 <th align="left"><input type="submit" value="convert"> &nbsp;
-<input type="button" value="clear" onclick="clear_button();"></th>
+<input type="button" value="clear" onclick="clear_button();"> &nbsp;
+<input type="checkbox" id="minus_conv">minus conv. (- → +-)</th>
 <th></th>
 </tr><tr>
 <th align="left" valign="top">out:</th>
