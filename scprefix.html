@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-18 v1.04
+    2015-1-18 v1.05
 -->
 <style type="text/css">
 <!--
@@ -773,7 +773,7 @@ var SCPrefix;
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
                     // ***** エスケープのとき *****
-                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}")) { i++; }
+                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}")) { i++; continue; }
                     // ***** デリミタのとき *****
                     if (ch == "}") { break; }
                     // ***** 改行のとき *****
