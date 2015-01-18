@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-18 v1.03
+    2015-1-18 v1.04
 -->
 <style type="text/css">
 <!--
@@ -711,6 +711,7 @@ var SCPrefix;
         var src_st_len;   // ソースの長さ
         var ch, ch2;      // 文字
         var line_no;      // 行番号(1オリジン)
+        var line_no_tk;   // トークン開始時点の行番号
         var temp_st;      // 作業用文字列
 
         // ***** トークン分割 *****
@@ -721,21 +722,30 @@ var SCPrefix;
         while (i < src_st_len) {
             // ***** 1文字取り出す *****
             i_start = i;
+            line_no_tk = line_no;
             ch = src_st.charAt(i++);
             if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
             // ***** 空白かTABのとき *****
             if (ch == " " || ch == "\t") { continue; }
             // ***** 改行のとき *****
-            if (ch == "\r" && ch2 == "\n") { i++; line_no++; continue; }
-            if (ch == "\r" || ch == "\n") { line_no++; continue; }
+            if (ch == "\r" || ch == "\n") {
+                line_no++;
+                if (ch == "\r" && ch2 == "\n") { i++; }
+                continue;
+            }
             // ***** コメント「//」のとき *****
             if (ch == "/" && ch2 == "/") {
                 i++;
                 while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
-                    if (ch == "\r" && ch2 == "\n") { i++; line_no++; break; }
-                    if (ch == "\r" || ch == "\n") { line_no++; break; }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                        break;
+                    }
                 }
                 continue;
             }
@@ -743,42 +753,54 @@ var SCPrefix;
             if (ch == "/" && ch2 == "*") {
                 i++;
                 while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    // ***** デリミタのとき *****
                     if (ch == "*" && ch2 == "/") { i++; break; }
-                    if (ch == "\r" && ch2 == "\n") { i++; line_no++; continue; }
-                    if (ch == "\r" || ch == "\n") { line_no++; continue; }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                    }
                 }
                 continue;
             }
             // ***** 波括弧リテラル「{ ～ }」のとき *****
             if (ch == "{") {
                 while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
-                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}")) { i++; continue; }
+                    // ***** エスケープのとき *****
+                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}")) { i++; }
+                    // ***** デリミタのとき *****
                     if (ch == "}") { break; }
-                    if (ch == "\r" && ch2 == "\n") { i++; line_no++; continue; }
-                    if (ch == "\r" || ch == "\n") { line_no++; continue; }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                    }
                 }
+                // ***** 波括弧を外して登録 *****
                 if (ch == "}") { j = i - 1; } else { j = i; }
                 if (i_start + 1 < j) {
                     temp_st = src_st.substring(i_start + 1, j)
                         .replace(/\\\{/g, "{")   // 「{」のエスケープ
                         .replace(/\\\}/g, "}")   // 「}」のエスケープ
                         .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
-                    token_push(temp_st, line_no);
+                    token_push(temp_st, line_no_tk);
                 }
                 continue;
             }
             // ***** 演算子のとき *****
             if (ch == "(" || ch == ")" || ch == "~" || ch == "?" || ch == ":" || ch == ";" || ch == ",") {
-                token_push(src_st.substring(i_start, i), line_no);
+                token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
             if (ch == "=" || ch == "!" || ch == "^" || ch == "\\" || ch == "%") {
                 if (ch2 == "=") { i++; }
-                token_push(src_st.substring(i_start, i), line_no);
+                token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
             if (ch == "+" || ch == "-" || ch == "*") {
@@ -792,10 +814,10 @@ var SCPrefix;
                 // (-を+-に変換することで、多項式の変換結果を若干見やすくする)
                 if (minus_conv) {
                     if (temp_st == "-") {
-                        token_push("+", line_no);
+                        token_push("+", line_no_tk);
                     }
                 }
-                token_push(temp_st, line_no);
+                token_push(temp_st, line_no_tk);
                 continue;
             }
             if (ch == "/") {
@@ -804,7 +826,7 @@ var SCPrefix;
                     i++;
                     if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
                 }
-                token_push(src_st.substring(i_start, i), line_no);
+                token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
             if (ch == "<" || ch == ">") {
@@ -813,12 +835,12 @@ var SCPrefix;
                     i++;
                     if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
                 }
-                token_push(src_st.substring(i_start, i), line_no);
+                token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
             if (ch == "&" || ch == "|") {
                 if (ch2 == ch || ch2 == "=") { i++; }
-                token_push(src_st.substring(i_start, i), line_no);
+                token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
             // ***** その他のとき *****
@@ -831,7 +853,7 @@ var SCPrefix;
                 // ***** その他のとき *****
                 i++;
             }
-            token_push(src_st.substring(i_start, i), line_no);
+            token_push(src_st.substring(i_start, i), line_no_tk);
         }
         // ***** 終端4個追加(安全のため) *****
         token_push("(end)", line_no);
