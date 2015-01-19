@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-18 v1.05
+    2015-1-19 v1.06
 -->
 <style type="text/css">
 <!--
@@ -514,13 +514,28 @@ var SCPrefix;
         code_pos1 = code.length;
         // debugpos1 = i;
         tok = token[i].word;
-        // ***** 論理NOT,ビットNOT,負符号のとき *****
-        if (tok == "!" || tok == "~" || tok == "-") {
+        // ***** 論理NOT,ビットNOTのとき *****
+        if (tok == "!" || tok == "~") {
             i++;
             code_push("(", debugpos1, i);
             code_push(opfunc(tok), debugpos1, i);
             i = c_factor(i, tok_end);
             code_push(")", debugpos1, i);
+            return i;
+        }
+        // ***** 負符号のとき *****
+        if (tok == "-") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push(opfunc(tok), debugpos1, i);
+            i = c_factor(i, tok_end);
+            code_push(")", debugpos1, i);
+            // (最適化処理 : 負符号が連続したときは削除する)
+            if (code_pos1 <= code.length + 6 &&
+                code[code_pos1 + 2].word == "(" && code[code_pos1 + 3].word == "-") {
+                code.splice(code_pos1, 4);
+                code.splice(code.length - 2, 2);
+            }
             return i;
         }
         // ***** 正符号のとき *****
@@ -941,7 +956,7 @@ var SCPrefix;
 <th></th>
 <th align="left"><input type="submit" value="convert"> &nbsp;
 <input type="button" value="clear" onclick="clear_button();"> &nbsp;
-<input type="checkbox" id="minus_conv">minus conv. (- → +-)</th>
+<input type="checkbox" id="minus_conv">:「-」→「+-」</th>
 <th></th>
 </tr><tr>
 <th align="left" valign="top">out:</th>
