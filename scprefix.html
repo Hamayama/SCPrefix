@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-19 v1.06
+    2015-1-19 v1.07
 -->
 <style type="text/css">
 <!--
@@ -569,6 +569,7 @@ var SCPrefix;
                         code.splice(code.length - 1, 1);
                     }
                 }
+                code_pos2 = code.length;
                 i = c_expression(i, tok_end);
             }
             match2(")", i++);
