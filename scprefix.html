@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-19 v1.07
+    2015-1-20 v1.08
 -->
 <style type="text/css">
 <!--
@@ -593,6 +593,7 @@ var SCPrefix;
             var_name = token[i].word;
             i++;
             if (operator_table.hasOwnProperty(var_name)) {
+                debugpos2 = i;
                 throw new Error("不正な位置に演算子 '" + var_name + "' が見つかりました。");
             }
             code_push(var_name, debugpos1, i);
@@ -604,10 +605,11 @@ var SCPrefix;
             return i;
         }
 
-        // ***** 変数名の取得 *****
-        var_name = tok;
+        // ***** 名前の取得 *****
+        var_name = token[i].word;
         i++;
         if (operator_table.hasOwnProperty(var_name)) {
+            debugpos2 = i;
             throw new Error("不正な位置に演算子 '" + var_name + "' が見つかりました。");
         }
 
@@ -633,7 +635,7 @@ var SCPrefix;
             return i;
         }
 
-        // ***** 変数の処理 *****
+        // ***** 変数のとき *****
 
         // ***** トークン取り出し *****
         tok = token[i].word;
