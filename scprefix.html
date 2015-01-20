@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-20 v1.08
+    2015-1-20 v1.09
 -->
 <style type="text/css">
 <!--
@@ -106,73 +106,77 @@ function clear_button() {
 var SCPrefix;
 (function (SCPrefix) {
     // ***** 定数 *****
-    var operator_table = { // 演算子情報
-        "("  :"(",
-        ")"  :")",
-        "!"  :"not",
-        "~"  :"lognot",
-        "+"  :"+",
-        "-"  :"-",
-        "++" :"inc!",
-        "--" :"dec!",
-        "**" :"expt",
-        "*"  :"*",
-        "/"  :"/",
-        "*." :"*.",
-        "/." :"/.",
-        "\\" :"quotient",
-        "%"  :"modulo",
-        // "+"  :"+",     // 重複
-        // "-"  :"-",     // 重複
-        "+." :"+.",
-        "-." :"-.",
-        "<<" :"ash",
-        ">>" :"ash",      // (ash n1 (- n2))
-        "<"  :"<",
-        "<=" :"<=",
-        ">"  :">",
-        ">=" :">=",
-        "==" :"=",
-        "!=" :"=",        // (not (= n1 n2))
-        "&"  :"logand",
-        "|"  :"logior",
-        "^"  :"logxor",
-        "&&" :"and",
-        "||" :"or",
-        "?"  :"if",
-        ":"  :":",
-        ","  :",",
-        "="  :"set!",
-        "*=" :"*=",
-        "/=" :"/=",
-        "*.=":"*.=",
-        "/.=":"/.=",
-        "+=" :"+=",
-        "-=" :"-=",
-        "+.=":"+.=",
-        "-.=":"-.=",
-        "\\=":"\\=",
-        "%=" :"%=",
-        "<<=":"<<=",
-        ">>=":">>=",
-        "&=" :"&=",
-        "|=" :"|=",
-        "^=" :"^=" };
+    var operator_data = [ // 演算子データ
+        // 演算子, 変換名, 優先順位(大きいほど優先,0は無効)
+        ["(",   "(",        0],
+        [")",   ")",        0],
+        ["++",  "inc!",     0],
+        ["--",  "dec!",     0],
+        ["**",  "expt",     45],
+        ["!",   "not",      0],
+        ["~",   "lognot",   0],
+        // ["+",   "+",        0], // 重複
+        // ["-",   "-",        0], // 重複
+        ["*",   "*",        40],
+        ["/",   "/",        40],
+        ["*.",  "*.",       40],
+        ["/.",  "/.",       40],
+        ["\\",  "quotient", 40],
+        ["%",   "modulo",   40],
+        ["+",   "+",        30],
+        ["-",   "-",        30],
+        ["+.",  "+.",       30],
+        ["-.",  "-.",       30],
+        ["<<",  "ash",      25],
+        [">>",  "ash",      25], // (ash n1 (- n2))
+        ["<",   "<",        20],
+        ["<=",  "<=",       20],
+        [">",   ">",        20],
+        [">=",  ">=",       20],
+        ["==",  "=",        20],
+        ["!=",  "=",        20], // (not (= n1 n2))
+        ["&",   "logand",   15],
+        ["|",   "logior",   15],
+        ["^",   "logxor",   15],
+        ["&&",  "and",      10],
+        ["||",  "or",       10],
+        ["?",   "if",       10],
+        [":",   ":",        0],
+        [",",   ",",        0],
+        ["=",   "set!",     0],
+        ["*=",  "*=",       0],
+        ["/=",  "/=",       0],
+        ["*.=", "*.=",      0],
+        ["/.=", "/.=",      0],
+        ["+=",  "+=",       0],
+        ["-=",  "-=",       0],
+        ["+.=", "+.=",      0],
+        ["-.=", "-.=",      0],
+        ["\\=", "\\=",      0],
+        ["%=",  "%=",       0],
+        ["<<=", "<<=",      0],
+        [">>=", ">>=",      0],
+        ["&=",  "&=",       0],
+        ["|=",  "|=",       0],
+        ["^=",  "^=",       0] ];
 
     // ***** 変数 *****
-    var src_st;      // ソース(文字列)
-    var minus_conv;  // マイナス変換フラグ(boolean)
-    var out_st;      // テキスト出力(文字列)
-    var html_st;     // HTML出力(文字列)
-    var token = [];  // トークン(配列)
-                     //   token[i].word     単語(文字列)
-                     //   token[i].line_no  行番号(1オリジン)
-    var code = [];   // コード(配列)
-                     //   code[i].word      単語(文字列)
-                     //   code[i].pos1      デバッグ位置1
-                     //   code[i].pos2      デバッグ位置2
-    var debugpos1;   // デバッグ位置1
-    var debugpos2;   // デバッグ位置2
+    var src_st;              // ソース(文字列)
+    var minus_conv;          // マイナス変換フラグ(boolean)
+    var out_st;              // テキスト出力(文字列)
+    var html_st;             // HTML出力(文字列)
+    var operator_table = {}; // 演算子情報(連想配列オブジェクト)
+                             //   operator_table[op].funcname  変換名
+                             //   operator_table[op].priority  優先順位(大きいほど優先,0は無効)
+    var token = [];          // トークン(配列)
+                             //   token[i].word     単語(文字列)
+                             //   token[i].line_no  行番号(1オリジン)
+    var code = [];           // コード(配列)
+                             //   code[i].word      単語(文字列)
+                             //   code[i].pos1      デバッグ位置1
+                             //   code[i].pos2      デバッグ位置2
+    var debugpos1;           // デバッグ位置1
+    var debugpos2;           // デバッグ位置2
 
     // ***** 公開I/F *****
 
@@ -191,6 +195,8 @@ var SCPrefix;
         src_st = src_st1;
         // ***** マイナス変換フラグの取得 *****
         minus_conv = minus_conv1;
+        // ***** 演算子情報の生成 *****
+        make_optable();
         // ***** トークン分割 *****
         tokenize();
         // ***** コンパイル *****
@@ -314,13 +320,8 @@ var SCPrefix;
             // ***** トークン取り出し *****
             debugpos1 = i;
             tok = token[i].word;
-            // ***** 「;」のとき *****
-            if (tok == ";") {
-                i++;
-                continue;
-            }
-            // ***** 終端のとき *****
-            if (tok == "(end)") {
+            // ***** 「;」または終端のとき *****
+            if (tok == ";" || tok == "(end)") {
                 i++;
                 continue;
             }
@@ -360,135 +361,89 @@ var SCPrefix;
             tok = token[i].word;
 
             // ***** 論理AND,ORのとき *****
-            if ((tok == "&&" || tok == "||") && priority < 10) {
-                i++;
-                code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 10);
-                // (最適化処理 : 同一演算子による計算をまとめる)
-                while (i < tok_end) {
-                    if (token[i].word != tok) { break; }
-                    i++;
-                    i = c_expression(i, tok_end, 10);
-                }
-                code_push(")", debugpos1, i);
-                continue;
-            }
-            // ***** 3項演算子のとき *****
-            if (tok == "?" && priority < 10) {
-                i++;
-                code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 9); // 右結合
-                match2(":", i++);
-                i = c_expression(i, tok_end, 9); // 右結合
-                // match2(";", i++);
-                code_push(")", debugpos1, i);
-                continue;
-            }
-
             // ***** ビットAND,OR,XORのとき *****
-            if ((tok == "&" || tok == "|" || tok == "^") && priority < 15) {
+            // ***** 加減算のとき *****
+            // ***** 乗除算のとき *****
+            if ((
+                tok == "&&" || tok == "||" ||
+                tok == "&"  || tok == "|"  || tok == "^"  ||
+                tok == "+"  || tok == "-"  || tok == "+." || tok == "-." ||
+                tok == "*"  || tok == "/"  || tok == "*." || tok == "/.") && priority < op_pri(tok)) {
                 i++;
                 code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 15);
+                code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
+                i = c_expression(i, tok_end, op_pri(tok));
                 // (最適化処理 : 同一演算子による計算をまとめる)
                 while (i < tok_end) {
                     if (token[i].word != tok) { break; }
                     i++;
-                    i = c_expression(i, tok_end, 15);
+                    i = c_expression(i, tok_end, op_pri(tok));
                 }
                 code_push(")", debugpos1, i);
                 continue;
             }
 
             // ***** 数値比較のとき *****
-            if ((tok == "<" || tok == "<=" || tok == ">" || tok == ">=" ||
-                tok == "==") && priority < 20) {
+            // ***** 整数除算または整数剰余のとき *****
+            // ***** 左ビットシフトのとき *****
+            if ((
+                tok == "<"  || tok == "<=" || tok == ">"  || tok == ">=" || tok == "==" ||
+                tok == "\\" || tok == "%"  ||
+                tok == "<<") && priority < op_pri(tok)) {
                 i++;
                 code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 20);
+                code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
+                i = c_expression(i, tok_end, op_pri(tok));
                 code_push(")", debugpos1, i);
                 continue;
             }
-            if (tok == "!=" && priority < 20) {
+
+            // ***** 3項演算子のとき *****
+            if (tok == "?" && priority < op_pri(tok)) {
+                i++;
+                code_insert(code_pos1, "(", debugpos1, i);
+                code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
+                i = c_expression(i, tok_end, op_pri(tok) - 1); // 右結合
+                match2(":", i++);
+                i = c_expression(i, tok_end, op_pri(tok) - 1); // 右結合
+                // match2(";", i++);
+                code_push(")", debugpos1, i);
+                continue;
+            }
+
+            // ***** 非等価演算子のとき *****
+            if (tok == "!=" && priority < op_pri(tok)) {
                 i++;
                 code_insert(code_pos1, "(", debugpos1, i);
                 code_insert(code_pos1 + 1, "not", debugpos1, i);
                 code_insert(code_pos1 + 2, "(", debugpos1, i);
-                code_insert(code_pos1 + 3, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 20);
+                code_insert(code_pos1 + 3, op_func(tok), debugpos1, i);
+                i = c_expression(i, tok_end, op_pri(tok));
                 code_push(")", debugpos1, i);
                 code_push(")", debugpos1, i);
                 continue;
             }
 
-            // ***** ビットシフトのとき *****
-            if ((tok == "<<" || tok == ">>") && priority < 25) {
+            // ***** 右ビットシフトのとき *****
+            if (tok == ">>" && priority < op_pri(tok)) {
                 i++;
                 code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                if (tok == ">>") {
-                    code_push("(", debugpos1, i);
-                    code_push("-", debugpos1, i);
-                    i = c_expression(i, tok_end, 25);
-                    code_push(")", debugpos1, i);
-                } else {
-                    i = c_expression(i, tok_end, 25);
-                }
+                code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
+                code_push("(", debugpos1, i);
+                code_push("-", debugpos1, i);
+                i = c_expression(i, tok_end, op_pri(tok));
                 code_push(")", debugpos1, i);
-                continue;
-            }
-
-            // ***** 加減算のとき *****
-            if ((tok == "+" || tok == "-" || tok == "+." || tok == "-.") && priority < 30) {
-                i++;
-                code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 30);
-                // (最適化処理 : 同一演算子による計算をまとめる)
-                while (i < tok_end) {
-                    if (token[i].word != tok) { break; }
-                    i++;
-                    i = c_expression(i, tok_end, 30);
-                }
-                code_push(")", debugpos1, i);
-                continue;
-            }
-
-            // ***** 乗除算のとき *****
-            if ((tok == "*" || tok == "/" || tok == "*." || tok == "/.") && priority < 40) {
-                i++;
-                code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 40);
-                // (最適化処理 : 同一演算子による計算をまとめる)
-                while (i < tok_end) {
-                    if (token[i].word != tok) { break; }
-                    i++;
-                    i = c_expression(i, tok_end, 40);
-                }
-                code_push(")", debugpos1, i);
-                continue;
-            }
-            if ((tok == "\\" || tok == "%") && priority < 40) {
-                i++;
-                code_insert(code_pos1, "(", debugpos1, i);
-                code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-                i = c_expression(i, tok_end, 40);
                 code_push(")", debugpos1, i);
                 continue;
             }
 
             // (べき乗の処理は、単項の負符号より強くするため c_factor に移動)
             // ***** べき乗のとき *****
-            // if (tok == "**" && priority < 45) {
+            // if (tok == "**" && priority < op_pri(tok)) {
             //     i++;
             //     code_insert(code_pos1, "(", debugpos1, i);
-            //     code_insert(code_pos1 + 1, opfunc(tok), debugpos1, i);
-            //     i = c_expression(i, tok_end, 44); // 右結合
+            //     code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
+            //     i = c_expression(i, tok_end, op_pri(tok) - 1); // 右結合
             //     code_push(")", debugpos1, i);
             //     continue;
             // }
@@ -518,7 +473,7 @@ var SCPrefix;
         if (tok == "!" || tok == "~") {
             i++;
             code_push("(", debugpos1, i);
-            code_push(opfunc(tok), debugpos1, i);
+            code_push(op_func(tok), debugpos1, i);
             i = c_factor(i, tok_end);
             code_push(")", debugpos1, i);
             return i;
@@ -527,7 +482,7 @@ var SCPrefix;
         if (tok == "-") {
             i++;
             code_push("(", debugpos1, i);
-            code_push(opfunc(tok), debugpos1, i);
+            code_push(op_func(tok), debugpos1, i);
             i = c_factor(i, tok_end);
             code_push(")", debugpos1, i);
             // (最適化処理 : 負符号が連続したときは削除する)
@@ -589,7 +544,7 @@ var SCPrefix;
             code_push("(", debugpos1, i);
             code_push("begin", debugpos1, i);
             code_push("(", debugpos1, i);
-            code_push(opfunc(tok), debugpos1, i);
+            code_push(op_func(tok), debugpos1, i);
             var_name = token[i].word;
             i++;
             if (operator_table.hasOwnProperty(var_name)) {
@@ -646,7 +601,7 @@ var SCPrefix;
             code_push("begin0", debugpos1, i);
             code_push(var_name, debugpos1, i);
             code_push("(", debugpos1, i);
-            code_push(opfunc(tok), debugpos1, i);
+            code_push(op_func(tok), debugpos1, i);
             code_push(var_name, debugpos1, i);
             code_push(")", debugpos1, i);
             code_push(")", debugpos1, i);
@@ -660,7 +615,7 @@ var SCPrefix;
             code_push("(", debugpos1, i);
             code_push("begin", debugpos1, i);
             code_push("(", debugpos1, i);
-            code_push(opfunc(tok), debugpos1, i);
+            code_push(op_func(tok), debugpos1, i);
             code_push(var_name, debugpos1, i);
             i = c_expression(i, tok_end);
             code_push(")", debugpos1, i);
@@ -677,11 +632,11 @@ var SCPrefix;
             code_push("(", debugpos1, i);
             code_push("begin", debugpos1, i);
             code_push("(", debugpos1, i);
-            code_push(opfunc("="), debugpos1, i);
+            code_push(op_func("="), debugpos1, i);
             code_push(var_name, debugpos1, i);
             code_push("(", debugpos1, i);
             op = tok.substring(0, tok.length - 1);
-            code_push(opfunc(op), debugpos1, i);
+            code_push(op_func(op), debugpos1, i);
             code_push(var_name, debugpos1, i);
             if (op == ">>") {
                 code_push("(", debugpos1, i);
@@ -715,7 +670,7 @@ var SCPrefix;
         if (token[i].word == "**") {
             i++;
             code_insert(code_pos1, "(", debugpos1, i);
-            code_insert(code_pos1 + 1, opfunc("**"), debugpos1, i);
+            code_insert(code_pos1 + 1, op_func("**"), debugpos1, i);
             i = c_factor(i, tok_end);
             code_push(")", debugpos1, i);
         }
@@ -880,6 +835,21 @@ var SCPrefix;
         token_push("(end)", line_no);
     }
 
+    // ***** 演算子情報の生成 *****
+    function make_optable() {
+        var i;
+        var op_obj = {};
+
+        // ***** 演算子情報の生成 *****
+        operator_table = {};
+        for (i = 0; i < operator_data.length; i++) {
+            op_obj = {};
+            op_obj.funcname = operator_data[i][1];
+            op_obj.priority = operator_data[i][2];
+            operator_table[operator_data[i][0]] = op_obj;
+        }
+    }
+
     // ***** トークン追加 *****
     function token_push(word, line_no) {
         var tk = {};
@@ -921,11 +891,17 @@ var SCPrefix;
     }
 
     // ***** 演算子検索 *****
-    function opfunc(op) {
+    function op_func(op) {
         if (operator_table.hasOwnProperty(op)) {
-            return operator_table[op];
+            return operator_table[op].funcname;
         }
-        throw new Error("未登録の演算子 '" + op + "' が見つかりました。");
+        throw new Error("未登録の演算子 '" + op + "' が見つかりました。(0001)");
+    }
+    function op_pri(op) {
+        if (operator_table.hasOwnProperty(op)) {
+            return operator_table[op].priority;
+        }
+        throw new Error("未登録の演算子 '" + op + "' が見つかりました。(0002)");
     }
 
     // ***** HTML文字列のエスケープ処理 *****
