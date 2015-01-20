@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-20 v1.09
+    2015-1-20 v1.10
 -->
 <style type="text/css">
 <!--
@@ -469,28 +469,13 @@ var SCPrefix;
         code_pos1 = code.length;
         // debugpos1 = i;
         tok = token[i].word;
-        // ***** 論理NOT,ビットNOTのとき *****
-        if (tok == "!" || tok == "~") {
+        // ***** 論理NOT,ビットNOT,負符号のとき *****
+        if (tok == "!" || tok == "~" || tok == "-") {
             i++;
             code_push("(", debugpos1, i);
             code_push(op_func(tok), debugpos1, i);
             i = c_factor(i, tok_end);
             code_push(")", debugpos1, i);
-            return i;
-        }
-        // ***** 負符号のとき *****
-        if (tok == "-") {
-            i++;
-            code_push("(", debugpos1, i);
-            code_push(op_func(tok), debugpos1, i);
-            i = c_factor(i, tok_end);
-            code_push(")", debugpos1, i);
-            // (最適化処理 : 負符号が連続したときは削除する)
-            if (code_pos1 <= code.length + 6 &&
-                code[code_pos1 + 2].word == "(" && code[code_pos1 + 3].word == "-") {
-                code.splice(code_pos1, 4);
-                code.splice(code.length - 2, 2);
-            }
             return i;
         }
         // ***** 正符号のとき *****
