@@ -2,7 +2,7 @@
 ;; -*- coding: utf-8 -*-
 ;;
 ;; calcfile.scm
-;; 2015-1-21
+;; 2015-1-22
 ;;
 ;; ＜内容＞
 ;;   ファイルからS式を読み込んで評価し、
@@ -27,7 +27,9 @@
      (eval (quote (begin ,@(map (lambda (m)
                                   `(use ,m))
                                 modules))) ,name)
-     (eval '(extend null) ,name)
+     ;; (完全に空のモジュールにするため変更)
+     ;(eval '(extend null) ,name)
+     (eval '(extend) ,name)
      (begin
        ,@(map (lambda (sym)
                 `(define-in-module ,name ,sym ,sym))
