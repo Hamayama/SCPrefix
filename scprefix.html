@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-2-4 v1.13
+    2015-2-4 v1.14
 -->
 <style type="text/css">
 <!--
@@ -280,7 +280,7 @@ var SCPrefix;
             c_statement(0, token.length - 4); // 終端4個分マイナス
             for (i = 0; i < code.length; i++) {
                 // ***** 生成コードに終端がまざっていたとき *****
-                if (code[i].word == "(end)") {
+                if (code[i].word == "%end") {
                     debugpos2 = token.length - 4; // 終端4個分マイナス
                     throw new Error("文が未完成です。");
                 }
