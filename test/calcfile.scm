@@ -2,7 +2,7 @@
 ;; -*- coding: utf-8 -*-
 ;;
 ;; calcfile.scm
-;; 2015-1-22
+;; 2015-2-4
 ;;
 ;; ＜内容＞
 ;;   ファイルからS式を読み込んで評価し、
@@ -47,7 +47,8 @@
   and or if
   set! define
   begin begin0
-  sin cos gcd)
+  sin cos gcd
+  vector ~)
 
 
 ;; デバッグ表示

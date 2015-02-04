@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-1-24 v1.12
+    2015-2-4 v1.13
 -->
 <style type="text/css">
 <!--
@@ -175,6 +175,7 @@ var SCPrefix;
                              //   code[i].word      単語(文字列)
                              //   code[i].pos1      デバッグ位置1
                              //   code[i].pos2      デバッグ位置2
+                             //   code[i].opt       最適化用情報
     var debugpos1;           // デバッグ位置1
     var debugpos2;           // デバッグ位置2
 
@@ -298,13 +299,24 @@ var SCPrefix;
         }
         // ***** 後処理 *****
         for (i = 0; i < code.length; i++) {
-            // (最適化処理 : 括弧のbeginのリネームを元に戻す)
-            if (code[i].word == "(begin)") {
+            // (最適化処理 : begin,begin0のリネームを元に戻す)
+            if (code[i].word == "%begin") {
                 code[i].word = "begin";
+                continue;
+            }
+            if (code[i].word == "%begin0") {
+                code[i].word = "begin0";
+                continue;
             }
             // (終端処理 : エラー表示用)
-            if (code[i].word == "(end)") {
+            if (code[i].word == "%end") {
                 code[i].word = "";
+                continue;
+            }
+            // (波括弧処理 : 開き波括弧を外す)
+            if (code[i].word.charAt(0) == "{") {
+                code[i].word = code[i].word.substring(1);
+                continue;
             }
         }
     }
@@ -313,6 +325,7 @@ var SCPrefix;
         var i;
         var tok;
         var code_pos1;
+        var opt_val;
 
         // ***** トークン解析のループ *****
         i = tok_start;
@@ -321,7 +334,7 @@ var SCPrefix;
             debugpos1 = i;
             tok = token[i].word;
             // ***** セミコロンまたは終端のとき *****
-            if (tok == ";" || tok == "(end)") {
+            if (tok == ";" || tok == "%end") {
                 i++;
                 continue;
             }
@@ -330,11 +343,13 @@ var SCPrefix;
             i = c_expression(i, tok_end);
             // (最適化処理 : 代入のbegin,begin0を削除 (戻り値が不要のため))
             if (code_pos1 <= code.length + 4 && code[code_pos1].word == "(") {
-                if (code[code_pos1 + 1].word == "begin") {
+                if (code[code_pos1 + 1].word == "%begin") {
+                    opt_val = code[code_pos1 + 1].opt; // (変数の長さを取得)
                     code.splice(code_pos1, 2);
-                    code.splice(code.length - 2, 2);
-                } else if (code[code_pos1 + 1].word == "begin0") {
-                    code.splice(code_pos1, 3);
+                    code.splice(code.length - (opt_val + 1), opt_val + 1);
+                } else if (code[code_pos1 + 1].word == "%begin0") {
+                    opt_val = code[code_pos1 + 1].opt; // (変数の長さを取得)
+                    code.splice(code_pos1, 2 + opt_val);
                     code.splice(code.length - 1, 1);
                 }
             }
@@ -456,13 +471,16 @@ var SCPrefix;
     }
     // ***** 因子のコンパイル *****
     function c_factor(tok_start, tok_end) {
-        var i;
+        var i, i2;
         var tok;
         var code_pos1;
         var code_pos2;
         var comma_count;
         var var_name;
         var op;
+        var pre_flag;
+        var pre_op;
+        var opt_val;
 
         // ***** トークン取り出し *****
         i = tok_start;
@@ -489,8 +507,7 @@ var SCPrefix;
             i++;
             // ***** 式のコンパイル *****
             code_push("(", debugpos1, i);
-            // (最適化処理 : 括弧のbeginを代入のbeginと区別するためにリネーム)
-            code_push("(begin)", debugpos1, i);
+            code_push("begin", debugpos1, i);
             code_pos2 = code.length;
             i = c_expression(i, tok_end);
             // ***** カンマ区切りの処理 *****
@@ -501,14 +518,17 @@ var SCPrefix;
                 comma_count++;
                 // (最適化処理 : 代入のbegin,begin0を削除 (戻り値が不要のため))
                 if (code_pos2 <= code.length + 4 && code[code_pos2].word == "(") {
-                    if (code[code_pos2 + 1].word == "begin") {
-                        code.splice(code_pos2, 2);
-                        code.splice(code.length - 2, 2);
-                    } else if (code[code_pos2 + 1].word == "begin0") {
-                        code.splice(code_pos2, 3);
+                    if (code[code_pos1 + 1].word == "%begin") {
+                        opt_val = code[code_pos1 + 1].opt; // (変数の長さを取得)
+                        code.splice(code_pos1, 2);
+                        code.splice(code.length - (opt_val + 1), opt_val + 1);
+                    } else if (code[code_pos1 + 1].word == "%begin0") {
+                        opt_val = code[code_pos1 + 1].opt; // (変数の長さを取得)
+                        code.splice(code_pos1, 2 + opt_val);
                         code.splice(code.length - 1, 1);
                     }
                 }
+                // ***** 式のコンパイル *****
                 code_pos2 = code.length;
                 i = c_expression(i, tok_end);
             }
@@ -526,23 +546,11 @@ var SCPrefix;
         // ***** プレINC,DECのとき *****
         if (tok == "++" || tok == "--") {
             i++;
-            code_push("(", debugpos1, i);
-            code_push("begin", debugpos1, i);
-            code_push("(", debugpos1, i);
-            code_push(op_func(tok), debugpos1, i);
-            var_name = token[i].word;
-            i++;
-            if (operator_table.hasOwnProperty(var_name)) {
-                debugpos2 = i;
-                throw new Error("不正な位置に演算子 '" + var_name + "' が見つかりました。");
-            }
-            code_push(var_name, debugpos1, i);
-            code_push(")", debugpos1, i);
-            code_push(var_name, debugpos1, i);
-            code_push(")", debugpos1, i);
-            // ***** べき乗の処理 *****
-            i = c_power(i, tok_end, code_pos1);
-            return i;
+            pre_flag = true;
+            pre_op = tok;
+        } else {
+            pre_flag = false;
+            pre_op = "";
         }
 
         // ***** 名前の取得 *****
@@ -554,7 +562,7 @@ var SCPrefix;
         }
 
         // ***** 関数のとき *****
-        if (token[i].word == "(") {
+        if (token[i].word == "(" && !pre_flag) {
             i++;
             code_push("(", debugpos1, i);
             code_push(var_name, debugpos1, i);
@@ -577,17 +585,64 @@ var SCPrefix;
 
         // ***** 変数のとき *****
 
+        // ***** 変数名をセット *****
+        code_pos1 = code.length;
+        code_push(var_name, debugpos1, i);
+        // ***** 配列のとき *****
+        if (token[i].word == "[") {
+            i++;
+            // ***** 式のコンパイル *****
+            code_insert(code_pos1, "(", debugpos1, i);
+            code_insert(code_pos1 + 1, "~", debugpos1, i);
+            i = c_expression(i, tok_end);
+            match2("]", i++);
+            // ***** 多次元配列のとき *****
+            while (i < tok_end) {
+                if (token[i].word != "[") { break; }
+                i++;
+                // ***** 式のコンパイル *****
+                i = c_expression(i, tok_end);
+                match2("]", i++);
+            }
+            code_push(")", debugpos1, i);
+        }
+
+        // ***** プレINC,DECのとき *****
+        if (pre_flag) {
+            code_insert(code_pos1, "(", debugpos1, i);
+            // (最適化処理 : 最適化用にbeginをリネーム)
+            code_insert(code_pos1 + 1, "%begin", debugpos1, i);
+            code_insert(code_pos1 + 2, "(", debugpos1, i);
+            code_insert(code_pos1 + 3, op_func(pre_op), debugpos1, i);
+            code_pos2 = code.length;
+            code[code_pos1 + 1].opt = code_pos2 - (code_pos1 + 4); // (変数の長さを保存)
+            code_push(")", debugpos1, i);
+            // code_push(var_name, debugpos1, i);
+            for (i2 = code_pos1 + 4; i2 < code_pos2; i2++) {
+                code_push(code[i2].word, debugpos1, i);
+            }
+            code_push(")", debugpos1, i);
+            // ***** べき乗の処理 *****
+            i = c_power(i, tok_end, code_pos1);
+            return i;
+        }
+
         // ***** トークン取り出し *****
         tok = token[i].word;
         // ***** ポストINC,DECのとき *****
         if (tok == "++" || tok == "--") {
             i++;
-            code_push("(", debugpos1, i);
-            code_push("begin0", debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            code_insert(code_pos1, "(", debugpos1, i);
+            // (最適化処理 : 最適化用にbegin0をリネーム)
+            code_insert(code_pos1 + 1, "%begin0", debugpos1, i);
+            code_pos2 = code.length;
+            code[code_pos1 + 1].opt = code_pos2 - (code_pos1 + 2); // (変数の長さを保存)
             code_push("(", debugpos1, i);
             code_push(op_func(tok), debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            // code_push(var_name, debugpos1, i);
+            for (i2 = code_pos1 + 2; i2 < code_pos2; i2++) {
+                code_push(code[i2].word, debugpos1, i);
+            }
             code_push(")", debugpos1, i);
             code_push(")", debugpos1, i);
             // ***** べき乗の処理 *****
@@ -597,14 +652,19 @@ var SCPrefix;
         // ***** 代入のとき *****
         if (tok == "=") {
             i++;
-            code_push("(", debugpos1, i);
-            code_push("begin", debugpos1, i);
-            code_push("(", debugpos1, i);
-            code_push(op_func(tok), debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            code_insert(code_pos1, "(", debugpos1, i);
+            // (最適化処理 : 最適化用にbeginをリネーム)
+            code_insert(code_pos1 + 1, "%begin", debugpos1, i);
+            code_insert(code_pos1 + 2, "(", debugpos1, i);
+            code_insert(code_pos1 + 3, op_func(tok), debugpos1, i);
+            code_pos2 = code.length;
+            code[code_pos1 + 1].opt = code_pos2 - (code_pos1 + 4); // (変数の長さを保存)
             i = c_expression(i, tok_end);
             code_push(")", debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            // code_push(var_name, debugpos1, i);
+            for (i2 = code_pos1 + 4; i2 < code_pos2; i2++) {
+                code_push(code[i2].word, debugpos1, i);
+            }
             code_push(")", debugpos1, i);
             return i;
         }
@@ -614,15 +674,20 @@ var SCPrefix;
             tok == "\\=" || tok == "%="  || tok == "<<=" || tok == ">>=" ||
             tok == "&="  || tok == "|="  || tok == "^=") {
             i++;
-            code_push("(", debugpos1, i);
-            code_push("begin", debugpos1, i);
-            code_push("(", debugpos1, i);
-            code_push(op_func("="), debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            code_insert(code_pos1, "(", debugpos1, i);
+            // (最適化処理 : 最適化用にbeginをリネーム)
+            code_insert(code_pos1 + 1, "%begin", debugpos1, i);
+            code_insert(code_pos1 + 2, "(", debugpos1, i);
+            code_insert(code_pos1 + 3, op_func("="), debugpos1, i);
+            code_pos2 = code.length;
+            code[code_pos1 + 1].opt = code_pos2 - (code_pos1 + 4); // (変数の長さを保存)
             code_push("(", debugpos1, i);
             op = tok.substring(0, tok.length - 1);
             code_push(op_func(op), debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            // code_push(var_name, debugpos1, i);
+            for (i2 = code_pos1 + 4; i2 < code_pos2; i2++) {
+                code_push(code[i2].word, debugpos1, i);
+            }
             if (op == ">>") {
                 code_push("(", debugpos1, i);
                 code_push("-", debugpos1, i);
@@ -633,13 +698,13 @@ var SCPrefix;
             }
             code_push(")", debugpos1, i);
             code_push(")", debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            // code_push(var_name, debugpos1, i);
+            for (i2 = code_pos1 + 4; i2 < code_pos2; i2++) {
+                code_push(code[i2].word, debugpos1, i);
+            }
             code_push(")", debugpos1, i);
             return i;
         }
-
-        // ***** 変数名をセット *****
-        code_push(var_name, debugpos1, i);
 
         // ***** べき乗の処理 *****
         i = c_power(i, tok_end, code_pos1);
@@ -740,10 +805,10 @@ var SCPrefix;
                         if (ch == "\r" && ch2 == "\n") { i++; }
                     }
                 }
-                // ***** 波括弧を外して登録 *****
+                // ***** 閉じ波括弧を外して登録 *****
                 if (ch == "}") { j = i - 1; } else { j = i; }
-                if (i_start + 1 < j) {
-                    temp_st = src_st.substring(i_start + 1, j)
+                if (i_start + 1 < j) { // 波括弧内が0文字なら登録しない
+                    temp_st = src_st.substring(i_start, j)
                         .replace(/\\\{/g, "{")   // 「{」のエスケープ
                         .replace(/\\\}/g, "}")   // 「}」のエスケープ
                         .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
@@ -752,7 +817,8 @@ var SCPrefix;
                 continue;
             }
             // ***** 演算子のとき *****
-            if (ch == "(" || ch == ")" || ch == "~" || ch == "?" || ch == ":" || ch == ";" || ch == ",") {
+            if (ch == "(" || ch == ")" || ch == "~" || ch == "?" || ch == ":" ||
+                ch == ";" || ch == "," || ch == "[" || ch == "]") {
                 token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
@@ -809,17 +875,17 @@ var SCPrefix;
                 ch = src_st.charAt(i);
                 // ***** デリミタのとき *****
                 // (ドットは不要だった)
-                if (" \t\r\n()~?:;,=!^\\%+-*/<>&|{}".indexOf(ch) >= 0) { break; }
+                if (" \t\r\n()~?:;,=!^\\%+-*/<>&|{}[]".indexOf(ch) >= 0) { break; }
                 // ***** その他のとき *****
                 i++;
             }
             token_push(src_st.substring(i_start, i), line_no_tk);
         }
         // ***** 終端4個追加(安全のため) *****
-        token_push("(end)", line_no);
-        token_push("(end)", line_no);
-        token_push("(end)", line_no);
-        token_push("(end)", line_no);
+        token_push("%end", line_no);
+        token_push("%end", line_no);
+        token_push("%end", line_no);
+        token_push("%end", line_no);
     }
 
     // ***** 演算子情報の生成 *****
@@ -851,6 +917,7 @@ var SCPrefix;
         cd.word = word;
         cd.pos1 = pos1;
         cd.pos2 = pos2;
+        cd.opt = 0;
         code.push(cd);
     }
 
@@ -860,6 +927,7 @@ var SCPrefix;
         cd.word = word;
         cd.pos1 = pos1;
         cd.pos2 = pos2;
+        cd.opt = 0;
         code.splice(i, 0, cd);
     }
 
