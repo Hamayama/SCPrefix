@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-5-21 v1.15
+    2015-6-21 v1.16
 -->
 <style type="text/css">
 <!--
@@ -112,9 +112,9 @@ function sample_button(sample_no) {
         case 2:
             src_st = "// Array sample\n"
                 + "define(a, {'((1 2 3) (4 5 6) (7 8 9))});\n"
-                + "print(a[0][0], {\" \"}, a[0][1], {\" \"}, a[0][2]);\n"
-                + "print(a[1][0], {\" \"}, a[1][1], {\" \"}, a[1][2]);\n"
-                + "print(a[2][0], {\" \"}, a[2][1], {\" \"}, a[2][2]);\n";
+                + "print(a[0][0], \" \", a[0][1], \" \", a[0][2]);\n"
+                + "print(a[1][0], \" \", a[1][1], \" \", a[1][2]);\n"
+                + "print(a[2][0], \" \", a[2][1], \" \", a[2][2]);\n";
             break;
         default:
             src_st = "";
@@ -856,6 +856,29 @@ var SCPrefix;
                         .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
                     token_push(temp_st, line_no_tk);
                 }
+                continue;
+            }
+            // ***** 文字列リテラル「" ～ "」のとき *****
+            if (ch == '"') {
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    // ***** エスケープのとき *****
+                    if (ch == "\\" && (ch2 == "\\" || ch2 == '"')) { i++; continue; }
+                    // ***** デリミタのとき *****
+                    if (ch == '"') { break; }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                    }
+                }
+                // ***** 登録 *****
+                temp_st = src_st.substring(i_start, i)
+                    .replace(/\\"/g,  '"')   // 「"」のエスケープ
+                    .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
+                token_push(temp_st, line_no_tk);
                 continue;
             }
             // ***** 演算子のとき *****
