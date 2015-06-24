@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-6-21 v1.16
+    2015-6-24 v1.17
 -->
 <style type="text/css">
 <!--
@@ -169,6 +169,7 @@ var SCPrefix;
         ["-",   "-",        30],
         ["+.",  "+.",       30],
         ["-.",  "-.",       30],
+        ["%%",  "string-append", 30],
         ["<<",  "ash",      25],
         [">>",  "ash",      25], // (ash n1 (- n2))
         ["<",   "<",        20],
@@ -194,6 +195,7 @@ var SCPrefix;
         ["-=",  "-=",       0],
         ["+.=", "+.=",      0],
         ["-.=", "-.=",      0],
+        ["%%=", "%%=",      0],
         ["\\=", "\\=",      0],
         ["%=",  "%=",       0],
         ["<<=", "<<=",      0],
@@ -424,7 +426,7 @@ var SCPrefix;
             if ((
                 tok == "&&" || tok == "||" ||
                 tok == "&"  || tok == "|"  || tok == "^"  ||
-                tok == "+"  || tok == "-"  || tok == "+." || tok == "-." ||
+                tok == "+"  || tok == "-"  || tok == "+." || tok == "-." || tok == "%%" ||
                 tok == "*"  || tok == "/"  || tok == "*." || tok == "/.") && priority < op_pri(tok)) {
                 i++;
                 code_insert(code_pos1, "(", debugpos1, i);
@@ -711,7 +713,7 @@ var SCPrefix;
             return i;
         }
         // ***** 複合代入のとき *****
-        if (tok == "+="  || tok == "-="  || tok == "+.=" || tok == "-.=" ||
+        if (tok == "+="  || tok == "-="  || tok == "+.=" || tok == "-.=" || tok == "%%=" ||
             tok == "*="  || tok == "/="  || tok == "*.=" || tok == "/.=" ||
             tok == "\\=" || tok == "%="  || tok == "<<=" || tok == ">>=" ||
             tok == "&="  || tok == "|="  || tok == "^=") {
@@ -887,7 +889,7 @@ var SCPrefix;
                 token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
-            if (ch == "=" || ch == "!" || ch == "^" || ch == "\\" || ch == "%") {
+            if (ch == "=" || ch == "!" || ch == "^" || ch == "\\") {
                 if (ch2 == "=") { i++; }
                 token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
@@ -919,7 +921,7 @@ var SCPrefix;
                 token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
-            if (ch == "<" || ch == ">") {
+            if (ch == "<" || ch == ">" || ch == "%") {
                 if (ch2 == "=") { i++; }
                 if (ch2 == ch) {
                     i++;
