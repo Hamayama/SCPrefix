@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-6-26 v1.20
+    2015-10-31 v1.21
 -->
 <style type="text/css">
 <!--
@@ -883,10 +883,11 @@ var SCPrefix;
                     }
                 }
                 // ***** 登録 *****
-                temp_st = src_st.substring(i_start, i)
-                    .replace(/\\"/g,  '"')   // 「"」のエスケープ
-                    .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
-                token_push(temp_st, line_no_tk);
+                // temp_st = src_st.substring(i_start, i)
+                //     .replace(/\\"/g,  '"')   // 「"」のエスケープ
+                //     .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
+                // token_push(temp_st, line_no_tk);
+                token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
             // ***** 演算子のとき *****
