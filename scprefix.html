@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-4 v1.22
+    2015-11-4 v1.23
 -->
 <style type="text/css">
 <!--
@@ -500,9 +500,9 @@ var SCPrefix;
                 code_insert(code_pos1, "(", debugpos1, i);
                 code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
                 i = c_expression(i, tok_end, op_pri(tok) - 1); // 右結合
-                match2(":", i++);
+                match2(":", i++, tok_end);
                 i = c_expression(i, tok_end, op_pri(tok) - 1); // 右結合
-                // match2(";", i++);
+                // match2(";", i++, tok_end);
                 code_push(")", debugpos1, i);
                 continue;
             }
@@ -623,7 +623,7 @@ var SCPrefix;
                 code_pos2 = code.length;
                 i = c_expression(i, tok_end);
             }
-            match2(")", i++);
+            match2(")", i++, tok_end);
             if (comma_count == 0) {
                 // (最適化処理 : 括弧のbeginを削除 (式が1個しかないため))
                 code.splice(code_pos1, 2);
@@ -672,7 +672,7 @@ var SCPrefix;
                     if (token[i].word != ",") { break; }
                     i++;
                 }
-                match2(")", i++);
+                match2(")", i++, tok_end);
             }
             code_push(")", debugpos1, i);
             // ***** べき乗の処理 *****
@@ -692,7 +692,7 @@ var SCPrefix;
             code_insert(code_pos1, "(", debugpos1, i);
             code_insert(code_pos1 + 1, "~", debugpos1, i);
             i = c_expression(i, tok_end);
-            match2("]", i++);
+            match2("]", i++, tok_end);
             // ***** 多次元配列のとき *****
             while (i < tok_end) {
                 i = skip_line_feed(i, tok_end);
@@ -701,7 +701,7 @@ var SCPrefix;
                 i++;
                 // ***** 式のコンパイル *****
                 i = c_expression(i, tok_end);
-                match2("]", i++);
+                match2("]", i++, tok_end);
             }
             code_push(")", debugpos1, i);
         }
@@ -1087,9 +1087,9 @@ var SCPrefix;
     }
 
     // ***** トークンの文字チェック *****
-    function match2(ch, i) {
-        if (i >= token.length - 4) { // 終端4個分マイナス
-            debugpos2 = token.length - 4; // 終端4個分マイナス
+    function match2(ch, i, tok_end) {
+        if (i >= tok_end) {
+            debugpos2 = tok_end;
             throw new Error("'" + ch + "' が見つかりませんでした。");
         }
         if (ch != token[i].word) {
