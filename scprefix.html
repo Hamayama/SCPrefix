@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-4 v1.24
+    2015-11-6 v1.25
 -->
 <style type="text/css">
 <!--
@@ -144,7 +144,7 @@ function sample_button(sample_no) {
 //     src_st      ソース(文字列)
 //     minus_conv  マイナス変換フラグ(boolean)
 //                   (-を+-に変換することで、多項式の変換結果を若干見やすくする)
-//     line_feed   改行反映フラグ(boolean)
+//     line_feed   改行(+コメント)反映フラグ(boolean)
 //     戻り値      結果オブジェクト
 //                   result.out   テキスト出力(文字列)
 //                   result.html  HTML出力(文字列)
@@ -211,7 +211,7 @@ var SCPrefix;
     // ***** 変数 *****
     var src_st;              // ソース(文字列)
     var minus_conv;          // マイナス変換フラグ(boolean)
-    var line_feed;           // 改行反映フラグ(boolean)
+    var line_feed;           // 改行(+コメント)反映フラグ(boolean)
     var out_st;              // テキスト出力(文字列)
     var html_st;             // HTML出力(文字列)
     var operator_table = {}; // 演算子情報(連想配列オブジェクト)
@@ -227,7 +227,8 @@ var SCPrefix;
                              //   code[i].opt       最適化用情報
     var debugpos1;           // デバッグ位置1
     var debugpos2;           // デバッグ位置2
-    var line_feed_num;       // 未出力の改行数
+    var line_feed_num;       // 未出力の改行(+コメント)数
+    var line_feed_code = []; // 未出力の改行(+コメント)(配列)
 
     // ***** 公開I/F *****
 
@@ -247,7 +248,7 @@ var SCPrefix;
         src_st = src_st1;
         // ***** マイナス変換フラグの取得 *****
         minus_conv = minus_conv1;
-        // ***** 改行反映フラグの取得 *****
+        // ***** 改行(+コメント)反映フラグの取得 *****
         line_feed = line_feed1;
         // ***** 演算子情報の生成 *****
         make_optable();
@@ -329,14 +330,18 @@ var SCPrefix;
         debugpos1 = 0;
         debugpos2 = 0;
         line_feed_num = 0;
+        line_feed_code = [];
         try {
             // ***** 文(ステートメント)のコンパイル *****
             tok_end = token.length - 4; // 終端4個分マイナス
             last_lf_num = 0;
             while (tok_end > 0) {
-                // ***** 末尾の改行を削除 *****
-                // (改行のスキップにより、1回多く読み込んでしまうことを回避するため)
-                if (token[tok_end - 1].word == "\n") {
+                // ***** 末尾の改行(+コメント)を削除 *****
+                // (改行(+コメント)のスキップにより、1回多くトークンを
+                //  読み込んでしまうことを回避するため)
+                if (token[tok_end - 1].word == "\n" ||
+                    token[tok_end - 1].word.substring(0, 2) == ";;" ||
+                    token[tok_end - 1].word.substring(0, 2) == "#|") {
                     last_lf_num++;
                     tok_end--;
                     continue;
@@ -345,9 +350,9 @@ var SCPrefix;
             }
             c_statement(0, tok_end);
             if (line_feed) {
-                // ***** 末尾の改行を戻す *****
+                // ***** 末尾の改行(+コメント)を戻す *****
                 for (i = 0; i < last_lf_num; i++) {
-                    code_push("\n", debugpos1, tok_end);
+                    code_push(token[tok_end + i].word, debugpos1, tok_end);
                 }
             }
             for (i = 0; i < code.length; i++) {
@@ -624,6 +629,7 @@ var SCPrefix;
                 i = c_expression(i, tok_end);
             }
             match2(")", i++, tok_end);
+            output_line_feed(i);
             if (comma_count == 0) {
                 // (最適化処理 : 括弧のbeginを削除 (式が1個しかないため))
                 code.splice(code_pos1, 2);
@@ -674,6 +680,7 @@ var SCPrefix;
                 }
                 match2(")", i++, tok_end);
             }
+            output_line_feed(i);
             code_push(")", debugpos1, i);
             // ***** べき乗の処理 *****
             i = c_power(i, tok_end, code_pos1);
@@ -703,6 +710,7 @@ var SCPrefix;
                 i = c_expression(i, tok_end);
                 match2("]", i++, tok_end);
             }
+            // output_line_feed(i);
             code_push(")", debugpos1, i);
         }
 
@@ -868,13 +876,10 @@ var SCPrefix;
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
                     // ***** 改行のとき *****
-                    if (ch == "\r" || ch == "\n") {
-                        line_no++;
-                        if (ch == "\r" && ch2 == "\n") { i++; }
-                        token_push("\n", line_no_tk);
-                        break;
-                    }
+                    if (ch == "\r" || ch == "\n") { i--; break; }
                 }
+                temp_st = ";; " + src_st.substring(i_start, i);
+                token_push(temp_st, line_no_tk);
                 continue;
             }
             // ***** コメント「/* ～ */」のとき *****
@@ -890,9 +895,11 @@ var SCPrefix;
                     if (ch == "\r" || ch == "\n") {
                         line_no++;
                         if (ch == "\r" && ch2 == "\n") { i++; }
-                        token_push("\n", line_no_tk);
+                        // token_push("\n", line_no_tk);
                     }
                 }
+                temp_st = "#| " + src_st.substring(i_start, i) + " |#";
+                token_push(temp_st, line_no_tk);
                 continue;
             }
             // ***** 波括弧「{ ～ }」のとき *****
@@ -1061,12 +1068,15 @@ var SCPrefix;
         code.splice(i, 0, cd);
     }
 
-    // ***** トークンの改行のスキップ *****
+    // ***** トークンの改行(+コメント)のスキップ *****
     function skip_line_feed(i, tok_end) {
         while (i < tok_end) {
-            if (token[i].word == "\n") {
+            if (token[i].word == "\n" ||
+                token[i].word.substring(0, 2) == ";;" ||
+                token[i].word.substring(0, 2) == "#|") {
                 i++;
                 line_feed_num++;
+                line_feed_code.push(token[i - 1].word);
                 continue;
             }
             break;
@@ -1074,16 +1084,17 @@ var SCPrefix;
         return i;
     }
 
-    // ***** コードの改行の出力 *****
-    // (呼び出すタイミングに注意する)
+    // ***** コードの改行(+コメント)の出力 *****
+    // (呼び出すタイミングに注意する(最適化処理と競合しないように))
     function output_line_feed(i) {
         var i2;
         if (line_feed) {
             for (i2 = 0; i2 < line_feed_num; i2++) {
-                code_push("\n", debugpos1, i);
+                code_push(line_feed_code[i2], debugpos1, i);
             }
         }
         line_feed_num = 0;
+        line_feed_code = [];
     }
 
     // ***** トークンの文字チェック *****
@@ -1146,7 +1157,7 @@ var SCPrefix;
 <th align="left"><input type="submit" value="convert"> &nbsp;
 <input type="button" value="clear" onclick="clear_button();"> &nbsp;
 <input type="checkbox" id="minus_conv">:「-」→「+-」 &nbsp;
-<input type="checkbox" id="line_feed" checked>: use line feed</th>
+<input type="checkbox" id="line_feed" checked>: line feed + comment</th>
 <th></th>
 </tr><tr>
 <th align="left" valign="top">out:</th>
