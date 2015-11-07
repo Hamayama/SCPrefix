@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-7 v1.26
+    2015-11-8 v1.27
 -->
 <style type="text/css">
 <!--
@@ -429,7 +429,7 @@ var SCPrefix;
             code_pos1 = code.length;
             i = c_expression(i, tok_end);
             // (最適化処理 : 代入のbegin,begin0を削除 (戻り値が不要のため))
-            if (code_pos1 <= code.length + 4 && code[code_pos1].word == "(") {
+            if (code_pos1 <= code.length - 4 && code[code_pos1].word == "(") {
                 if (code[code_pos1 + 1].word == "%begin") {
                     opt_val = code[code_pos1 + 1].opt; // (変数の長さを取得)
                     code.splice(code_pos1, 2);
@@ -660,7 +660,9 @@ var SCPrefix;
             i = skip_line_feed(i, tok_end);
             output_line_feed(i);
             code_pos2 = code.length;
-            i = c_expression(i, tok_end);
+            if (token[i].word != ")") {
+                i = c_expression(i, tok_end);
+            }
             // ***** カンマ区切りの処理 *****
             comma_count = 0;
             while (i < tok_end) {
@@ -677,7 +679,7 @@ var SCPrefix;
 
                 comma_count++;
                 // (最適化処理 : 代入のbegin,begin0を削除 (戻り値が不要のため))
-                if (code_pos2 <= code.length + 4 && code[code_pos2].word == "(") {
+                if (code_pos2 <= code.length - 4 && code[code_pos2].word == "(") {
                     if (code[code_pos2 + 1].word == "%begin") {
                         opt_val = code[code_pos2 + 1].opt; // (変数の長さを取得)
                         code.splice(code_pos2, 2);
@@ -1023,7 +1025,7 @@ var SCPrefix;
                 }
                 // ***** 閉じ波括弧を外して登録 *****
                 if (ch == "%" && ch2 == "}") { j = i - 2; } else { j = i; }
-                if (i_start + 1 < j) { // 波括弧内が0文字なら登録しない
+                if (i_start + 2 < j) { // 波括弧内が0文字なら登録しない
                     temp_st = src_st.substring(i_start, j)
                         .replace(/\\\{/g, "{")   // 「{」のエスケープ
                         .replace(/\\\}/g, "}")   // 「}」のエスケープ
