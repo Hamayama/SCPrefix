@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-6 v1.25
+    2015-11-7 v1.26
 -->
 <style type="text/css">
 <!--
@@ -109,12 +109,12 @@ function sample_button(sample_no) {
                 + "define(x,  pi /. 6);\n"
                 + "define(y1, 0);\n"
                 + "define(y2, 0);\n"
-                + "y1=exp({+i}*x);\n"
-                + "y2=cos(x)+{+i}*sin(x);\n";
+                + "y1=exp({%+i%}*x);\n"
+                + "y2=cos(x)+{%+i%}*sin(x);\n";
             break;
         case 2:
             src_st = "// Array sample\n"
-                + "define(a, {'((1 2 3) (4 5 6) (7 8 9))});\n"
+                + "define(a, {%'((1 2 3) (4 5 6) (7 8 9))%});\n"
                 + "print(a[0][0], \" \", a[0][1], \" \", a[0][2]);\n"
                 + "print(a[1][0], \" \", a[1][1], \" \", a[1][2]);\n"
                 + "print(a[2][0], \" \", a[2][1], \" \", a[2][2]);\n";
@@ -153,60 +153,65 @@ var SCPrefix;
 (function (SCPrefix) {
     // ***** 定数 *****
     var operator_data = [ // 演算子データ
-        // 演算子, 変換名, 優先順位(大きいほど優先,0は無効)
-        ["(",      "(",        0],
-        [")",      ")",        0],
-        ["++",     "inc!",     0],
-        ["--",     "dec!",     0],
-        ["**",     "expt",     45],
-        ["!",      "not",      0],
-        ["~",      "lognot",   0],
-        // ["+",      "+",        0], // 重複
-        // ["-",      "-",        0], // 重複
-        ["*",      "*",        40],
-        ["/",      "/",        40],
-        ["*.",     "*.",       40],
-        ["/.",     "/.",       40],
-        ["\\",     "quotient", 40],
-        ["%",      "modulo",   40],
-        ["+",      "+",        30],
-        ["-",      "-",        30],
-        ["+.",     "+.",       30],
-        ["-.",     "-.",       30],
-        ["%%",     "string-append", 30],
-        ["<<",     "ash",      25],
-        [">>",     "ash",      25], // (ash n1 (- n2))
-        ["<",      "<",        20],
-        ["<=",     "<=",       20],
-        [">",      ">",        20],
-        [">=",     ">=",       20],
-        ["==",     "=",        20],
-        ["!=",     "=",        20], // (not (= n1 n2))
-        ["&",      "logand",   15],
-        ["|",      "logior",   15],
-        ["^",      "logxor",   15],
-        ["&&",     "and",      10],
-        ["||",     "or",       10],
-        ["?",      "if",       10],
-        [":",      ":",        0],
-        [",",      ",",        0],
-        ["=",      "set!",     0],
-        ["*=",     "*=",       0],
-        ["/=",     "/=",       0],
-        ["*.=",    "*.=",      0],
-        ["/.=",    "/.=",      0],
-        ["+=",     "+=",       0],
-        ["-=",     "-=",       0],
-        ["+.=",    "+.=",      0],
-        ["-.=",    "-.=",      0],
-        ["%%=",    "%%=",      0],
-        ["\\=",    "\\=",      0],
-        ["%=",     "%=",       0],
-        ["<<=",    "<<=",      0],
-        [">>=",    ">>=",      0],
-        ["&=",     "&=",       0],
-        ["|=",     "|=",       0],
-        ["^=",     "^=",       0] ];
+        // 演算子, 変換名, 優先順位, キャスト判定用
+        ["(",      "(",          0,     0],
+        [")",      ")",          0,     0],
+        ["->",     "->",       100,     0],
+        ["++",     "inc!",       0,     1],
+        ["--",     "dec!",       0,     1],
+        ["**",     "expt",      90,     0],
+        ["!",      "not",        0,     1],
+        ["~",      "lognot",     0,     1],
+        // ["&",      "&",          0,     1], // 単項
+        // ["*",      "*",          0,     1], // 単項
+        // ["+",      "+",          0,     1], // 単項
+        // ["-",      "-",          0,     1], // 単項
+        // ["+.",     "+.",         0,     1], // 単項
+        // ["-.",     "-.",         0,     1], // 単項
+        ["*",      "*",         40,     0],
+        ["/",      "/",         40,     0],
+        ["*.",     "*.",        40,     0],
+        ["/.",     "/.",        40,     0],
+        ["\\",     "quotient",  40,     0],
+        ["%",      "modulo",    40,     0],
+        ["+",      "+",         30,     0],
+        ["-",      "-",         30,     0],
+        ["+.",     "+.",        30,     0],
+        ["-.",     "-.",        30,     0],
+        ["%%",     "string-append", 30, 0],
+        ["<<",     "ash",       25,     0],
+        [">>",     "ash",       25,     0], // (ash n1 (- n2))
+        ["<",      "<",         20,     0],
+        ["<=",     "<=",        20,     0],
+        [">",      ">",         20,     0],
+        [">=",     ">=",        20,     0],
+        ["==",     "=",         20,     0],
+        ["!=",     "=",         20,     0], // (not (= n1 n2))
+        ["&",      "logand",    15,     0],
+        ["|",      "logior",    15,     0],
+        ["^",      "logxor",    15,     0],
+        ["&&",     "and",       10,     0],
+        ["||",     "or",        10,     0],
+        ["?",      "if",        10,     0],
+        [":",      ":",         10,     0],
+        [",",      ",",          0,     0],
+        ["=",      "set!",       0,     0],
+        ["*=",     "*=",         0,     0],
+        ["/=",     "/=",         0,     0],
+        ["*.=",    "*.=",        0,     0],
+        ["/.=",    "/.=",        0,     0],
+        ["+=",     "+=",         0,     0],
+        ["-=",     "-=",         0,     0],
+        ["+.=",    "+.=",        0,     0],
+        ["-.=",    "-.=",        0,     0],
+        ["%%=",    "%%=",        0,     0],
+        ["\\=",    "\\=",        0,     0],
+        ["%=",     "%=",         0,     0],
+        ["<<=",    "<<=",        0,     0],
+        [">>=",    ">>=",        0,     0],
+        ["&=",     "&=",         0,     0],
+        ["|=",     "|=",         0,     0],
+        ["^=",     "^=",         0,     0]];
 
     // ***** 変数 *****
     var src_st;              // ソース(文字列)
@@ -217,6 +222,7 @@ var SCPrefix;
     var operator_table = {}; // 演算子情報(連想配列オブジェクト)
                              //   operator_table[op].funcname  変換名
                              //   operator_table[op].priority  優先順位(大きいほど優先,0は無効)
+                             //   operator_table[op].castflag  キャスト判定用(要修正)
     var token = [];          // トークン(配列)
                              //   token[i].word     単語(文字列)
                              //   token[i].line_no  行番号(1オリジン)
@@ -391,8 +397,8 @@ var SCPrefix;
                 continue;
             }
             // (波括弧処理 : 開き波括弧を外す)
-            if (code[i].word.charAt(0) == "{") {
-                code[i].word = code[i].word.substring(1);
+            if (code[i].word.substring(0, 2) == "{%") {
+                code[i].word = code[i].word.substring(2);
                 continue;
             }
         }
@@ -412,8 +418,10 @@ var SCPrefix;
             output_line_feed(i);
             debugpos1 = i;
             tok = token[i].word;
-            // ***** セミコロンまたは終端のとき *****
-            if (tok == ";" || tok == "%end") {
+            // ***** セミコロン,カンマ,終端のとき(要修正) *****
+            if (tok == ";" ||
+                tok == "," ||
+                tok == "%end") {
                 i++;
                 continue;
             }
@@ -473,6 +481,16 @@ var SCPrefix;
                 i++;
                 code_insert(code_pos1, "(", debugpos1, i);
                 code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
+
+                // (ポインタ型判定)(要修正)
+                if (tok == "*") {
+                    i = skip_line_feed(i, tok_end);
+                    if (token[i].word == "," || token[i].word == ")") {
+                        code_push(")", debugpos1, i);
+                        continue;
+                    }
+                }
+
                 i = c_expression(i, tok_end, op_pri(tok));
                 // (最適化処理 : 同一演算子による計算をまとめる)
                 while (i < tok_end) {
@@ -487,10 +505,12 @@ var SCPrefix;
             // ***** 数値比較のとき *****
             // ***** 整数除算または整数剰余のとき *****
             // ***** 左ビットシフトのとき *****
+            // ***** 間接メンバポインタのとき *****
             if ((
                 tok == "<"  || tok == "<=" || tok == ">"  || tok == ">=" || tok == "==" ||
                 tok == "\\" || tok == "%"  ||
-                tok == "<<") && priority < op_pri(tok)) {
+                tok == "<<" ||
+                tok == "->") && priority < op_pri(tok)) {
                 i++;
                 code_insert(code_pos1, "(", debugpos1, i);
                 code_insert(code_pos1 + 1, op_func(tok), debugpos1, i);
@@ -507,7 +527,13 @@ var SCPrefix;
                 i = c_expression(i, tok_end, op_pri(tok) - 1); // 右結合
                 match2(":", i++, tok_end);
                 i = c_expression(i, tok_end, op_pri(tok) - 1); // 右結合
+
+                // (区切りチェック)(要修正)
                 // match2(";", i++, tok_end);
+                i = skip_line_feed(i, tok_end);
+                // output_line_feed(i);
+                if (token[i].word == ";") { i++; }
+
                 code_push(")", debugpos1, i);
                 continue;
             }
@@ -563,6 +589,7 @@ var SCPrefix;
         var code_pos2;
         var comma_count;
         var var_name;
+        var var_name_flag;
         var op;
         var pre_flag;
         var pre_op;
@@ -581,8 +608,21 @@ var SCPrefix;
             code_push(tok, debugpos1, i);
             return i;
         }
-        // ***** 論理NOT,ビットNOT,負符号のとき *****
-        if (tok == "!" || tok == "~" || tok == "-") {
+        // ***** ポインタ,アドレスのとき(要修正) *****
+        if (tok == "*" || tok == "&") {
+            i++;
+            code_push("(", debugpos1, i);
+            code_push(tok, debugpos1, i);
+            i = c_factor(i, tok_end);
+            code_push(")", debugpos1, i);
+            return i;
+        }
+        // ***** 論理NOT,ビットNOT *****
+        // ***** 正符号,負符号のとき *****
+        // ***** 不正確数正符号,不正確数負符号のとき *****
+        if (tok == "!"  || tok == "~" ||
+            tok == "+"  || tok == "-" ||
+            tok == "+." || tok == "-.") {
             i++;
             code_push("(", debugpos1, i);
             code_push(op_func(tok), debugpos1, i);
@@ -590,18 +630,35 @@ var SCPrefix;
             code_push(")", debugpos1, i);
             return i;
         }
-        // ***** 正符号のとき *****
-        if (tok == "+") {
+        // // ***** 正符号のとき *****
+        // if (tok == "+") {
+        //     i++;
+        //     i = c_factor(i, tok_end);
+        //     return i;
+        // }
+
+        // ***** プレINC,DECのとき *****
+        if (tok == "++" || tok == "--") {
             i++;
-            i = c_factor(i, tok_end);
-            return i;
+            pre_flag = true;
+            pre_op = tok;
+        } else {
+            pre_flag = false;
+            pre_op = "";
         }
+
         // ***** 括弧のとき *****
-        if (tok == "(") {
+        i = skip_line_feed(i, tok_end);
+        // output_line_feed(i);
+        code_pos1 = code.length;
+        var_name_flag = false;
+        if (token[i].word == "(") {
             i++;
             // ***** 式のコンパイル *****
             code_push("(", debugpos1, i);
             code_push("begin", debugpos1, i);
+            i = skip_line_feed(i, tok_end);
+            output_line_feed(i);
             code_pos2 = code.length;
             i = c_expression(i, tok_end);
             // ***** カンマ区切りの処理 *****
@@ -609,8 +666,15 @@ var SCPrefix;
             while (i < tok_end) {
                 i = skip_line_feed(i, tok_end);
                 // output_line_feed(i);
-                if (token[i].word != ",") { break; }
-                i++;
+
+                // (区切りチェック)(要修正)
+                if (token[i].word == ")") { break; }
+                if (token[i].word == "," || token[i].word == ";") {
+                    i++;
+                    i = skip_line_feed(i, tok_end);
+                    if (token[i].word == ")") { break; }
+                }
+
                 comma_count++;
                 // (最適化処理 : 代入のbegin,begin0を削除 (戻り値が不要のため))
                 if (code_pos2 <= code.length + 4 && code[code_pos2].word == "(") {
@@ -625,80 +689,88 @@ var SCPrefix;
                     }
                 }
                 // ***** 式のコンパイル *****
+                i = skip_line_feed(i, tok_end);
+                output_line_feed(i);
                 code_pos2 = code.length;
                 i = c_expression(i, tok_end);
             }
             match2(")", i++, tok_end);
             output_line_feed(i);
+
+            // (キャスト判定)(要修正)
+            if (token[i].word != "\n" &&
+                token[i].word != ";"  &&
+                token[i].word != "%end" &&
+                token[i].word.substring(0, 2) != ";;" &&
+                token[i].word.substring(0, 2) != "#|" &&
+                (operator_table.hasOwnProperty(token[i].word) ?
+                 operator_table[token[i].word].castflag == 1 : true)) {
+                code.splice(code_pos1 + 1, 1);
+                i = c_factor(i, tok_end);
+                code_push(")", debugpos1, i);
+                return i;
+            }
+
             if (comma_count == 0) {
                 // (最適化処理 : 括弧のbeginを削除 (式が1個しかないため))
                 code.splice(code_pos1, 2);
             } else {
                 code_push(")", debugpos1, i);
             }
-            // ***** べき乗の処理 *****
-            i = c_power(i, tok_end, code_pos1);
-            return i;
-        }
-        // ***** プレINC,DECのとき *****
-        if (tok == "++" || tok == "--") {
-            i++;
-            pre_flag = true;
-            pre_op = tok;
+        // ***** 括弧以外のとき *****
         } else {
-            pre_flag = false;
-            pre_op = "";
-        }
-
-        // ***** 名前の取得 *****
-        i = skip_line_feed(i, tok_end);
-        // output_line_feed(i);
-        var_name = token[i].word;
-        i++;
-        if (operator_table.hasOwnProperty(var_name)) {
-            debugpos2 = i;
-            throw new Error("不正な位置に演算子 '" + var_name + "' が見つかりました。");
+            // ***** 名前の取得 *****
+            var_name = token[i].word;
+            var_name_flag = true;
+            code_push(var_name, debugpos1, i);
+            i++;
+            // (演算子チェック)(要修正)
+            if (var_name != ":" &&
+                operator_table.hasOwnProperty(var_name)) {
+                debugpos2 = i;
+                throw new Error("不正な位置に演算子 '" + var_name + "' が見つかりました。");
+            }
         }
 
         // ***** 関数のとき *****
         i = skip_line_feed(i, tok_end);
         // output_line_feed(i);
-        if (token[i].word == "(" && !pre_flag) {
+        if (token[i].word == "(" && var_name_flag) {
             i++;
-            code_push("(", debugpos1, i);
-            code_push(var_name, debugpos1, i);
+            code_insert(code_pos1, "(", debugpos1, i);
             // ***** 引数の取得 *****
             i = skip_line_feed(i, tok_end);
             // output_line_feed(i);
-            if (token[i].word == ")") {
-                i++;
-            } else {
+            if (token[i].word != ")") {
                 while (i < tok_end) {
                     i = c_expression(i, tok_end);
-                    if (token[i].word != ",") { break; }
-                    i++;
+                    // (区切りチェック)(要修正)
+                    if (token[i].word == ")") { break; }
+                    if (token[i].word == "," || token[i].word == ";") {
+                        i++;
+                        i = skip_line_feed(i, tok_end);
+                        if (token[i].word == ")") { break; }
+                    }
                 }
-                match2(")", i++, tok_end);
             }
+            match2(")", i++, tok_end);
             output_line_feed(i);
             code_push(")", debugpos1, i);
-            // ***** べき乗の処理 *****
-            i = c_power(i, tok_end, code_pos1);
-            return i;
         }
 
-        // ***** 変数のとき *****
-
-        // ***** 変数名をセット *****
-        code_pos1 = code.length;
-        code_push(var_name, debugpos1, i);
         // ***** 配列のとき *****
+        i = skip_line_feed(i, tok_end);
+        // output_line_feed(i);
         if (token[i].word == "[") {
             i++;
-            // ***** 式のコンパイル *****
             code_insert(code_pos1, "(", debugpos1, i);
             code_insert(code_pos1 + 1, "~", debugpos1, i);
-            i = c_expression(i, tok_end);
+            // ***** 添字の取得 *****
+            i = skip_line_feed(i, tok_end);
+            // output_line_feed(i);
+            if (token[i].word != "]") {
+                i = c_expression(i, tok_end);
+            }
             match2("]", i++, tok_end);
             // ***** 多次元配列のとき *****
             while (i < tok_end) {
@@ -706,8 +778,12 @@ var SCPrefix;
                 // output_line_feed(i);
                 if (token[i].word != "[") { break; }
                 i++;
-                // ***** 式のコンパイル *****
-                i = c_expression(i, tok_end);
+                // ***** 添字の取得 *****
+                i = skip_line_feed(i, tok_end);
+                // output_line_feed(i);
+                if (token[i].word != "]") {
+                    i = c_expression(i, tok_end);
+                }
                 match2("]", i++, tok_end);
             }
             // output_line_feed(i);
@@ -847,6 +923,7 @@ var SCPrefix;
         var line_no;      // 行番号(1オリジン)
         var line_no_tk;   // トークン開始時点の行番号
         var temp_st;      // 作業用文字列
+        var delim_ch;     // デリミタ文字
 
         // ***** トークン分割 *****
         token = [];
@@ -866,6 +943,31 @@ var SCPrefix;
                 line_no++;
                 if (ch == "\r" && ch2 == "\n") { i++; }
                 token_push("\n", line_no_tk);
+                continue;
+            }
+            // ***** プリプロセッサ「#」のとき *****
+            if (ch == "#") {
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    // ***** エスケープのとき *****
+                    if (ch == "\\" && (ch2 == "\r" || ch2 == "\n")) {
+                        temp_st = ";; " + src_st.substring(i_start, i);
+                        token_push(temp_st, line_no_tk);
+                        i++;
+                        line_no++;
+                        if (ch2 == "\r" && i < src_st_len && src_st.charAt(i) == "\n") { i++; }
+                        token_push("\n", line_no_tk);
+                        i_start = i;
+                        line_no_tk = line_no;
+                        continue;
+                    }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") { i--; break; }
+                }
+                temp_st = ";; " + src_st.substring(i_start, i);
+                token_push(temp_st, line_no_tk);
                 continue;
             }
             // ***** コメント「//」のとき *****
@@ -902,16 +1004,17 @@ var SCPrefix;
                 token_push(temp_st, line_no_tk);
                 continue;
             }
-            // ***** 波括弧「{ ～ }」のとき *****
-            if (ch == "{") {
+            // ***** 波括弧「{% ～ %}」のとき *****
+            if (ch == "{" && ch2 == "%") {
+                i++;
                 while (i < src_st_len) {
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
                     // ***** エスケープのとき *****
-                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}")) { i++; continue; }
+                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}" || ch2 == "%")) { i++; continue; }
                     // ***** デリミタのとき *****
-                    if (ch == "}") { break; }
+                    if (ch == "%" && ch2 == "}") { i++; break; }
                     // ***** 改行のとき *****
                     if (ch == "\r" || ch == "\n") {
                         line_no++;
@@ -919,26 +1022,37 @@ var SCPrefix;
                     }
                 }
                 // ***** 閉じ波括弧を外して登録 *****
-                if (ch == "}") { j = i - 1; } else { j = i; }
+                if (ch == "%" && ch2 == "}") { j = i - 2; } else { j = i; }
                 if (i_start + 1 < j) { // 波括弧内が0文字なら登録しない
                     temp_st = src_st.substring(i_start, j)
                         .replace(/\\\{/g, "{")   // 「{」のエスケープ
                         .replace(/\\\}/g, "}")   // 「}」のエスケープ
+                        .replace(/\\\%/g, "%")   // 「%」のエスケープ
                         .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
                     token_push(temp_st, line_no_tk);
                 }
                 continue;
             }
+            if (ch == "{") {
+                token_push("(", line_no_tk);
+                continue;
+            }
+            if (ch == "}") {
+                token_push(")", line_no_tk);
+                continue;
+            }
             // ***** 文字列リテラル「" ～ "」のとき *****
-            if (ch == '"') {
+            // ***** 文字列リテラル「' ～ '」のとき *****
+            if (ch == '"' || ch == "'") {
+                delim_ch = ch;
                 while (i < src_st_len) {
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
                     // ***** エスケープのとき *****
-                    if (ch == "\\" && (ch2 == "\\" || ch2 == '"')) { i++; continue; }
+                    if (ch == "\\" && (ch2 == "\\" || ch2 == delim_ch)) { i++; continue; }
                     // ***** デリミタのとき *****
-                    if (ch == '"') { break; }
+                    if (ch == delim_ch) { break; }
                     // ***** 改行のとき *****
                     if (ch == "\r" || ch == "\n") {
                         line_no++;
@@ -946,10 +1060,6 @@ var SCPrefix;
                     }
                 }
                 // ***** 登録 *****
-                // temp_st = src_st.substring(i_start, i)
-                //     .replace(/\\"/g,  '"')   // 「"」のエスケープ
-                //     .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
-                // token_push(temp_st, line_no_tk);
                 token_push(src_st.substring(i_start, i), line_no_tk);
                 continue;
             }
@@ -965,6 +1075,7 @@ var SCPrefix;
                 continue;
             }
             if (ch == "+" || ch == "-" || ch == "*") {
+                if (ch == "-" && ch2 == ">") { i++; }
                 if (ch2 == ch) { i++; }
                 if (ch2 == "=") { i++; }
                 if (ch2 == ".") {
@@ -977,6 +1088,8 @@ var SCPrefix;
                 if (minus_conv) {
                     if (temp_st == "-") {
                         token_push("+", line_no_tk);
+                    } else if (temp_st == "-.") {
+                        token_push("+.", line_no_tk);
                     }
                 }
                 token_push(temp_st, line_no_tk);
@@ -1011,8 +1124,8 @@ var SCPrefix;
                 // ***** 1文字取り出す *****
                 ch = src_st.charAt(i);
                 // ***** デリミタのとき *****
-                // (ドットは不要だった)
-                if (" \t\r\n()~?:;,=!^\\%+-*/<>&|{}[]".indexOf(ch) >= 0) { break; }
+                // (ドットは入れない)
+                if (" \t\r\n\"'()~?:;,=!^\\%+-*/<>&|{}[]".indexOf(ch) >= 0) { break; }
                 // ***** その他のとき *****
                 i++;
             }
@@ -1036,6 +1149,7 @@ var SCPrefix;
             op_obj = {};
             op_obj.funcname = operator_data[i][1];
             op_obj.priority = operator_data[i][2];
+            op_obj.castflag = operator_data[i][3];
             operator_table[operator_data[i][0]] = op_obj;
         }
     }
