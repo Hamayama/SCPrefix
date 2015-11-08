@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-8 v1.29
+    2015-11-8 v1.30
 -->
 <style type="text/css">
 <!--
@@ -711,9 +711,9 @@ var SCPrefix;
 
             // (キャスト判定)(要修正)
             if (close_paren_ch == "(" &&
-                token[i].word != ";"  &&
+                token[i].word != ";" &&
                 token[i].word != "%end" &&
-                token[i].kind != 0 &&
+                token[i].kind != 0  &&
                 token[i].kind != 51 &&
                 token[i].kind != 52 &&
                 (operator_table.hasOwnProperty(token[i].word) ?
@@ -1083,7 +1083,7 @@ var SCPrefix;
             }
             // ***** 演算子のとき *****
             if (ch == "(" || ch == ")" || ch == "~" || ch == "?" || ch == ":" ||
-                ch == ";" || ch == "," || ch == "[" || ch == "]") {
+                ch == ";" || ch == "," || ch == "{" || ch == "}" || ch == "[" || ch == "]") {
                 token_push(100);
                 continue;
             }
