@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-8 v1.27
+    2015-11-8 v1.28
 -->
 <style type="text/css">
 <!--
@@ -603,7 +603,7 @@ var SCPrefix;
         code_pos1 = code.length;
         tok = token[i].word;
         // ***** 文字列リテラルのとき *****
-        if (tok.charAt(0) == '"') {
+        if (tok.charAt(0) == '"' || tok.charAt(0) == "'") {
             i++;
             code_push(tok, debugpos1, i);
             return i;
