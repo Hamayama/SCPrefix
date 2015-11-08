@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-8 v1.28
+    2015-11-8 v1.29
 -->
 <style type="text/css">
 <!--
@@ -224,6 +224,10 @@ var SCPrefix;
                              //   operator_table[op].priority  優先順位(大きいほど優先,0は無効)
                              //   operator_table[op].castflag  キャスト判定用(要修正)
     var token = [];          // トークン(配列)
+                             //   token[i].kind     種別(=0:改行,
+                             //                          =51:1行コメント,
+                             //                          =52:複数行コメント,
+                             //                          =100:その他)
                              //   token[i].word     単語(文字列)
                              //   token[i].line_no  行番号(1オリジン)
     var code = [];           // コード(配列)
@@ -345,9 +349,9 @@ var SCPrefix;
                 // ***** 末尾の改行(+コメント)を削除 *****
                 // (改行(+コメント)のスキップにより、1回多くトークンを
                 //  読み込んでしまうことを回避するため)
-                if (token[tok_end - 1].word == "\n" ||
-                    token[tok_end - 1].word.substring(0, 2) == ";;" ||
-                    token[tok_end - 1].word.substring(0, 2) == "#|") {
+                if (token[tok_end - 1].kind == 0  ||
+                    token[tok_end - 1].kind == 51 ||
+                    token[tok_end - 1].kind == 52) {
                     last_lf_num++;
                     tok_end--;
                     continue;
@@ -587,6 +591,7 @@ var SCPrefix;
         var tok;
         var code_pos1;
         var code_pos2;
+        var close_paren_ch;
         var comma_count;
         var var_name;
         var var_name_flag;
@@ -652,7 +657,12 @@ var SCPrefix;
         // output_line_feed(i);
         code_pos1 = code.length;
         var_name_flag = false;
-        if (token[i].word == "(") {
+        if (token[i].word == "(" || token[i].word == "{") {
+            if (token[i].word == "(") {
+                close_paren_ch = ")";
+            } else {
+                close_paren_ch = "}";
+            }
             i++;
             // ***** 式のコンパイル *****
             code_push("(", debugpos1, i);
@@ -660,7 +670,7 @@ var SCPrefix;
             i = skip_line_feed(i, tok_end);
             output_line_feed(i);
             code_pos2 = code.length;
-            if (token[i].word != ")") {
+            if (token[i].word != close_paren_ch) {
                 i = c_expression(i, tok_end);
             }
             // ***** カンマ区切りの処理 *****
@@ -670,11 +680,11 @@ var SCPrefix;
                 // output_line_feed(i);
 
                 // (区切りチェック)(要修正)
-                if (token[i].word == ")") { break; }
+                if (token[i].word == close_paren_ch) { break; }
                 if (token[i].word == "," || token[i].word == ";") {
                     i++;
                     i = skip_line_feed(i, tok_end);
-                    if (token[i].word == ")") { break; }
+                    if (token[i].word == close_paren_ch) { break; }
                 }
 
                 comma_count++;
@@ -696,15 +706,16 @@ var SCPrefix;
                 code_pos2 = code.length;
                 i = c_expression(i, tok_end);
             }
-            match2(")", i++, tok_end);
+            match2(close_paren_ch, i++, tok_end);
             output_line_feed(i);
 
             // (キャスト判定)(要修正)
-            if (token[i].word != "\n" &&
+            if (close_paren_ch == "(" &&
                 token[i].word != ";"  &&
                 token[i].word != "%end" &&
-                token[i].word.substring(0, 2) != ";;" &&
-                token[i].word.substring(0, 2) != "#|" &&
+                token[i].kind != 0 &&
+                token[i].kind != 51 &&
+                token[i].kind != 52 &&
                 (operator_table.hasOwnProperty(token[i].word) ?
                  operator_table[token[i].word].castflag == 1 : true)) {
                 code.splice(code_pos1 + 1, 1);
@@ -927,6 +938,19 @@ var SCPrefix;
         var temp_st;      // 作業用文字列
         var delim_ch;     // デリミタ文字
 
+        // ***** トークン追加 *****
+        function token_push(kind, word) {
+            var tk = {};
+            tk.kind = kind;
+            if (word == null) {
+                tk.word = src_st.substring(i_start, i);
+            } else {
+                tk.word = word;
+            }
+            tk.line_no = line_no_tk;
+            token.push(tk);
+        }
+
         // ***** トークン分割 *****
         token = [];
         i = 0;
@@ -944,7 +968,7 @@ var SCPrefix;
             if (ch == "\r" || ch == "\n") {
                 line_no++;
                 if (ch == "\r" && ch2 == "\n") { i++; }
-                token_push("\n", line_no_tk);
+                token_push(0, "\n");
                 continue;
             }
             // ***** プリプロセッサ「#」のとき *****
@@ -956,11 +980,11 @@ var SCPrefix;
                     // ***** エスケープのとき *****
                     if (ch == "\\" && (ch2 == "\r" || ch2 == "\n")) {
                         temp_st = ";; " + src_st.substring(i_start, i);
-                        token_push(temp_st, line_no_tk);
+                        token_push(51, temp_st);
                         i++;
                         line_no++;
                         if (ch2 == "\r" && i < src_st_len && src_st.charAt(i) == "\n") { i++; }
-                        token_push("\n", line_no_tk);
+                        token_push(0, "\n");
                         i_start = i;
                         line_no_tk = line_no;
                         continue;
@@ -969,7 +993,7 @@ var SCPrefix;
                     if (ch == "\r" || ch == "\n") { i--; break; }
                 }
                 temp_st = ";; " + src_st.substring(i_start, i);
-                token_push(temp_st, line_no_tk);
+                token_push(51, temp_st);
                 continue;
             }
             // ***** コメント「//」のとき *****
@@ -983,7 +1007,7 @@ var SCPrefix;
                     if (ch == "\r" || ch == "\n") { i--; break; }
                 }
                 temp_st = ";; " + src_st.substring(i_start, i);
-                token_push(temp_st, line_no_tk);
+                token_push(51, temp_st);
                 continue;
             }
             // ***** コメント「/* ～ */」のとき *****
@@ -999,11 +1023,11 @@ var SCPrefix;
                     if (ch == "\r" || ch == "\n") {
                         line_no++;
                         if (ch == "\r" && ch2 == "\n") { i++; }
-                        // token_push("\n", line_no_tk);
+                        // token_push(0, "\n");
                     }
                 }
                 temp_st = "#| " + src_st.substring(i_start, i) + " |#";
-                token_push(temp_st, line_no_tk);
+                token_push(52, temp_st);
                 continue;
             }
             // ***** 波括弧「{% ～ %}」のとき *****
@@ -1031,16 +1055,8 @@ var SCPrefix;
                         .replace(/\\\}/g, "}")   // 「}」のエスケープ
                         .replace(/\\\%/g, "%")   // 「%」のエスケープ
                         .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
-                    token_push(temp_st, line_no_tk);
+                    token_push(100, temp_st);
                 }
-                continue;
-            }
-            if (ch == "{") {
-                token_push("(", line_no_tk);
-                continue;
-            }
-            if (ch == "}") {
-                token_push(")", line_no_tk);
                 continue;
             }
             // ***** 文字列リテラル「" ～ "」のとき *****
@@ -1062,18 +1078,18 @@ var SCPrefix;
                     }
                 }
                 // ***** 登録 *****
-                token_push(src_st.substring(i_start, i), line_no_tk);
+                token_push(100);
                 continue;
             }
             // ***** 演算子のとき *****
             if (ch == "(" || ch == ")" || ch == "~" || ch == "?" || ch == ":" ||
                 ch == ";" || ch == "," || ch == "[" || ch == "]") {
-                token_push(src_st.substring(i_start, i), line_no_tk);
+                token_push(100);
                 continue;
             }
             if (ch == "=" || ch == "!" || ch == "^" || ch == "\\") {
                 if (ch2 == "=") { i++; }
-                token_push(src_st.substring(i_start, i), line_no_tk);
+                token_push(100);
                 continue;
             }
             if (ch == "+" || ch == "-" || ch == "*") {
@@ -1089,12 +1105,12 @@ var SCPrefix;
                 // (-を+-に変換することで、多項式の変換結果を若干見やすくする)
                 if (minus_conv) {
                     if (temp_st == "-") {
-                        token_push("+", line_no_tk);
+                        token_push(100, "+");
                     } else if (temp_st == "-.") {
-                        token_push("+.", line_no_tk);
+                        token_push(100, "+.");
                     }
                 }
-                token_push(temp_st, line_no_tk);
+                token_push(100, temp_st);
                 continue;
             }
             if (ch == "/") {
@@ -1103,7 +1119,7 @@ var SCPrefix;
                     i++;
                     if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
                 }
-                token_push(src_st.substring(i_start, i), line_no_tk);
+                token_push(100);
                 continue;
             }
             if (ch == "<" || ch == ">" || ch == "%") {
@@ -1112,13 +1128,13 @@ var SCPrefix;
                     i++;
                     if (i < src_st_len && src_st.charAt(i) == "=") { i++; }
                 }
-                token_push(src_st.substring(i_start, i), line_no_tk);
+                token_push(100);
                 continue;
             }
             if (ch == "&" || ch == "|") {
                 if (ch2 == ch) { i++; }
                 if (ch2 == "=") { i++; }
-                token_push(src_st.substring(i_start, i), line_no_tk);
+                token_push(100);
                 continue;
             }
             // ***** その他のとき *****
@@ -1131,13 +1147,14 @@ var SCPrefix;
                 // ***** その他のとき *****
                 i++;
             }
-            token_push(src_st.substring(i_start, i), line_no_tk);
+            token_push(100);
         }
         // ***** 終端4個追加(安全のため) *****
-        token_push("%end", line_no);
-        token_push("%end", line_no);
-        token_push("%end", line_no);
-        token_push("%end", line_no);
+        line_no_tk = line_no;
+        token_push(100, "%end");
+        token_push(100, "%end");
+        token_push(100, "%end");
+        token_push(100, "%end");
     }
 
     // ***** 演算子情報の生成 *****
@@ -1154,14 +1171,6 @@ var SCPrefix;
             op_obj.castflag = operator_data[i][3];
             operator_table[operator_data[i][0]] = op_obj;
         }
-    }
-
-    // ***** トークン追加 *****
-    function token_push(word, line_no) {
-        var tk = {};
-        tk.word = word;
-        tk.line_no = line_no;
-        token.push(tk);
     }
 
     // ***** コード追加 *****
@@ -1187,9 +1196,9 @@ var SCPrefix;
     // ***** トークンの改行(+コメント)のスキップ *****
     function skip_line_feed(i, tok_end) {
         while (i < tok_end) {
-            if (token[i].word == "\n" ||
-                token[i].word.substring(0, 2) == ";;" ||
-                token[i].word.substring(0, 2) == "#|") {
+            if (token[i].kind == 0  ||
+                token[i].kind == 51 ||
+                token[i].kind == 52) {
                 i++;
                 line_feed_num++;
                 line_feed_code.push(token[i - 1].word);
