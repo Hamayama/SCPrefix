@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-9 v1.31
+    2015-11-9 v1.32
 -->
 <style type="text/css">
 <!--
@@ -286,9 +286,9 @@ var SCPrefix;
         // ***** 出力の生成(サブ) *****
         function make_output_sub(escape_func) {
             var i;
-            var output_st;       // 出力文字列
-            var code_length;     // コード数
-            var arr_st = [];     // 文字列の配列
+            var output_st;   // 出力文字列
+            var code_length; // コード数
+            var arr_st = []; // 文字列の配列
 
             // ***** 出力の生成(サブ) *****
             output_st = "";
@@ -940,13 +940,13 @@ var SCPrefix;
     // ***** トークン分割 *****
     function tokenize() {
         var i, j;
-        var i_start;      // 単語の開始位置
-        var src_st_len;   // ソースの長さ
-        var ch, ch2;      // 文字
-        var line_no;      // 行番号(1オリジン)
-        var line_no_tk;   // トークン開始時点の行番号
-        var temp_st;      // 作業用文字列
-        var delim_ch;     // デリミタ文字
+        var i_start;    // 単語の開始位置
+        var src_st_len; // ソースの長さ
+        var ch, ch2;    // 文字
+        var line_no;    // 行番号(1オリジン)
+        var line_no_tk; // トークン開始時点の行番号
+        var temp_st;    // 作業用文字列
+        var delim_ch;   // デリミタ文字
 
         // ***** トークン追加 *****
         function token_push(kind, word) {
