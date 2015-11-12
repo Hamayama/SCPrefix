@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2015-11-9 v1.33
+    2015-11-12 v1.34
 -->
 <style type="text/css">
 <!--
@@ -291,14 +291,14 @@ var SCPrefix;
         function make_output_sub(escape_func) {
             var i;
             var output_st;   // 出力文字列
-            var code_length; // コード数
+            var code_len;    // コード数
             var arr_st = []; // 文字列の配列
 
             // ***** 出力の生成(サブ) *****
             output_st = "";
             arr_st = [];
-            code_length = code.length;
-            for (i = 0; i < code_length; i++) {
+            code_len = code.length;
+            for (i = 0; i < code_len; i++) {
                 // ***** 前方の空白を追加 *****
                 if (i > 0 &&
                     !(code[i - 1].word == "(" || code[i].word == ")" ||
