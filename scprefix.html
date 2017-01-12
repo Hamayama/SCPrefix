@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2017-1-9 v1.40
+    2017-1-12 v1.41
 -->
 <style type="text/css">
 <!--
@@ -334,6 +334,8 @@ var SCPrefix;
     function compile() {
         var i;
         var msg;
+        var err_line1;
+        var err_line2;
         var tok_end;
         var last_lf_num;
 
@@ -377,14 +379,32 @@ var SCPrefix;
         } catch (ex) {
             // ***** 構文エラーのとき *****
             DebugShow("構文エラー: " + ex.message + ": debugpos=" + debugpos1 + "\n");
-            msg = "エラー場所: " + token[debugpos1].line_no + "行: ";
-            if (debugpos2 <= debugpos1) { debugpos2 = debugpos1 + 1; }
+            err_line1 = token[debugpos1].line_no;
+            msg = "エラー場所: " + err_line1 + "行";
+            err_line2 = 0;
+            if (debugpos1 < debugpos2) {
+                if (debugpos2 - 1 < tok_end) {
+                    err_line2 = token[debugpos2 - 1].line_no;
+                }
+            } else {
+                debugpos2 = debugpos1 + 1;
+            }
+            if (err_line1 < err_line2) {
+                msg += " - " + err_line2 + "行 の解析中に検出:\n";
+            } else {
+                msg += ": ";
+            }
             for (i = debugpos1; i < debugpos2; i++) {
                 if (i >= 0 && i < tok_end) {
                     msg = msg + token[i].word + " ";
                 }
             }
-            DebugShow(msg + "\n");
+            if (err_line1 < err_line2) {
+                msg += "\n===== エラー場所 ここまで =====\n";
+            } else {
+                msg += "\n";
+            }
+            DebugShow(msg);
         }
         // ***** 後処理 *****
         for (i = 0; i < code.length; i++) {
@@ -912,6 +932,7 @@ var SCPrefix;
         return i;
     }
     // ***** べき乗の処理 *****
+    // (単項の負符号より強くするため特別扱い)
     function c_power(tok_start, tok_end, code_pos1) {
         var i;
         var tok;
@@ -973,9 +994,10 @@ var SCPrefix;
         line_no = 1;
         src_st_len = src_st.length;
         while (i < src_st_len) {
-            // ***** 1文字取り出す *****
+            // ***** 開始情報更新 *****
             i_start = i;
             line_no_tk = line_no;
+            // ***** 1文字取り出す *****
             ch = src_st.charAt(i++);
             if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
             // ***** 空白かTABのとき *****
@@ -1010,6 +1032,7 @@ var SCPrefix;
                                 line_no++;
                                 if (ch == "\r" && ch2 == "\n") { i++; }
                                 token_push(0, "\n");
+                                // ***** 開始情報更新 *****
                                 i_start = i;
                                 line_no_tk = line_no;
                             }
