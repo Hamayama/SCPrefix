@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2017-4-18 v1.43
+    2017-6-6 v1.44
 -->
 <style type="text/css">
 <!--
@@ -264,7 +264,7 @@ var SCPrefix;
         // ***** 改行(+コメント)反映フラグの取得 *****
         line_feed = line_feed1;
         // ***** 演算子情報の生成 *****
-        make_optable();
+        make_operator_table();
         // ***** トークン分割 *****
         tokenize();
         // ***** コンパイル *****
@@ -1017,7 +1017,7 @@ var SCPrefix;
             // ***** 1文字取り出す *****
             ch = src_st.charAt(i++);
             ch2 = src_st.charAt(i);
-            // ***** 空白かTABのとき *****
+            // ***** 空白かタブのとき *****
             if (ch == " " || ch == "\t") { continue; }
             // ***** 改行のとき *****
             if (ch == "\r" || ch == "\n") {
@@ -1038,7 +1038,7 @@ var SCPrefix;
                             // ***** 1文字取り出す *****
                             ch = src_st.charAt(i++);
                             ch2 = src_st.charAt(i);
-                            // ***** 空白かTABのとき *****
+                            // ***** 空白かタブのとき *****
                             if (ch == " " || ch == "\t") { continue; }
                             // ***** 改行のとき *****
                             if (ch == "\r" || ch == "\n") {
@@ -1091,7 +1091,7 @@ var SCPrefix;
                             // ***** 1文字取り出す *****
                             ch = src_st.charAt(i++);
                             ch2 = src_st.charAt(i);
-                            // ***** 空白かTABのとき *****
+                            // ***** 空白かタブのとき *****
                             if (ch == " " || ch == "\t") { continue; }
                             // ***** 改行のとき *****
                             if (ch == "\r" || ch == "\n") {
@@ -1274,7 +1274,7 @@ var SCPrefix;
     }
 
     // ***** 演算子情報の生成 *****
-    function make_optable() {
+    function make_operator_table() {
         var i;
         var op_obj = {};
 
