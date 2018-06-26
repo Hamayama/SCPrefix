@@ -132,7 +132,7 @@
 - OS
   - Windows 8.1 (64bit)
 - ブラウザ
-  - Chrome v59
+  - Chrome v67
 
 ## 履歴
 - 2015-1-16  v1.00 (初版)

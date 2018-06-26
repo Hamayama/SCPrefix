@@ -6,7 +6,7 @@
 
 2.試験環境
   OS               : Windows 8.1 (64bit)
-  ブラウザ         : Chrome  v50.0.2661.94m
+  ブラウザ         : Chrome  v67
   スクリプトツール : Gauche  v0.9.6_pre7
   テキストエディタ : TeraPad v1.09
   差分確認ツール   : DF.exe  v1.41
