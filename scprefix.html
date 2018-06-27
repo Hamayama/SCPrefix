@@ -5,7 +5,7 @@
 <title>SCPrefix</title>
 <!--
     scprefix.html
-    2018-6-26 v1.46
+    2018-6-27 v1.47
 -->
 <style type="text/css">
 <!--
@@ -302,6 +302,10 @@ var SCPrefix;
         // ***** HTML出力の生成 *****
         // (単語をサニタイズ(タグ無効化)してから追加)
         html_st = make_output_sub(escape_html);
+        // ***** IE8対策 *****
+        if (document.attachEvent && !document.addEventListener) {
+            html_st = "<pre>" + html_st + "<\/pre>";
+        }
 
         // ***** デバッグ表示 *****
         if (0) {
